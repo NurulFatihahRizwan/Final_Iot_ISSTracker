@@ -1,148 +1,381 @@
-# server.py
-from flask import Flask, jsonify, send_file, send_from_directory, request
-from threading import Thread
-import time, datetime, json, os, csv
+#!/usr/bin/env python3
+import os
+import time
+import sqlite3
+import logging
 import requests
+from datetime import datetime, timedelta
+from threading import Thread, Event
+from flask import Flask, jsonify, send_file, request, Response, stream_with_context
+from flask_cors import CORS
 
-app = Flask(__name__)
+# ---------- Configuration ----------
+DB_PATH = os.environ.get("DB_PATH", "iss_data.db")
+API_URL = os.environ.get("ISS_API_URL", "https://api.wheretheiss.at/v1/satellites/25544")
+# Default interval in seconds. 86s -> ~1000 samples/day.
+# To change recording frequency set environment variable FETCH_INTERVAL_SEC (seconds).
+FETCH_INTERVAL = int(os.environ.get("FETCH_INTERVAL_SEC", "86"))
+MAX_RETENTION_DAYS = int(os.environ.get("MAX_RETENTION_DAYS", "3"))
+SAMPLE_DATA = os.environ.get("SAMPLE_DATA", "0") == "1"  # set to "1" to generate sample data on first run
+# Port used by local run; Render / gunicorn will override
+PORT = int(os.environ.get("PORT", "10000"))
 
-DATA_FILE = 'iss_data.json'
-RECORDS_PER_DAY = 1000
-FETCH_INTERVAL = 30  # seconds (~1000 samples/day)
+# ---------- Logging ----------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("iss-tracker")
 
-# Initialize data storage
-if os.path.exists(DATA_FILE):
-    with open(DATA_FILE, 'r') as f:
-        data = json.load(f)
-else:
-    data = {"days": {}}
+# ---------- Flask app ----------
+# static_folder="." lets us serve index.html with send_file("index.html")
+app = Flask(__name__, static_folder=".")
+CORS(app)
 
-def get_current_day():
-    """Return label like 'Day 1' and the ISO date for today based on start_date."""
-    if "start_date" not in data:
-        # store start_date as ISO date so day numbering is stable across restarts
-        data["start_date"] = datetime.date.today().isoformat()
-        with open(DATA_FILE, 'w') as f:
-            json.dump(data, f, indent=2)
-    start = datetime.date.fromisoformat(data["start_date"])
-    today = datetime.date.today()
-    day_number = (today - start).days + 1
-    return f"Day {day_number}", today.isoformat()
+# ---------- DB utilities ----------
+def get_conn():
+    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-def fetch_iss_data():
-    """Background thread to fetch ISS data continuously."""
-    while True:
-        day_label, day_date = get_current_day()
-        if day_label not in data["days"]:
-            data["days"][day_label] = []
+def init_database():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+      CREATE TABLE IF NOT EXISTS iss_positions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        altitude REAL,
+        timestamp TEXT NOT NULL,
+        day TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON iss_positions(timestamp)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_day ON iss_positions(day)")
+    conn.commit()
+    conn.close()
+    logger.info("Database initialized at %s", DB_PATH)
 
-        # Only keep up to RECORDS_PER_DAY for display/storage per requirement
-        if len(data["days"][day_label]) >= RECORDS_PER_DAY:
-            time.sleep(FETCH_INTERVAL)
-            continue
+def save_position(latitude, longitude, altitude, ts_utc):
+    # ts_utc must be a string "YYYY-MM-DD HH:MM:SS" in UTC
+    day = ts_utc.split(" ")[0]
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+      INSERT INTO iss_positions (latitude, longitude, altitude, timestamp, day)
+      VALUES (?, ?, ?, ?, ?)
+    """, (latitude, longitude, altitude, ts_utc, day))
+    conn.commit()
+    conn.close()
 
+def cleanup_old_data():
+    cutoff = (datetime.utcnow() - timedelta(days=MAX_RETENTION_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM iss_positions WHERE timestamp < ?", (cutoff,))
+    deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    if deleted:
+        logger.info("Cleaned up %d old records older than %s", deleted, cutoff)
+
+def get_record_count():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM iss_positions")
+    count = cur.fetchone()[0]
+    conn.close()
+    return count
+
+# ---------- Fetching ISS ----------
+def parse_wther_resp(data):
+    # data contains timestamp (unix), latitude, longitude, altitude
+    ts = datetime.utcfromtimestamp(int(data.get("timestamp", time.time())))
+    return {
+        "latitude": float(data.get("latitude")),
+        "longitude": float(data.get("longitude")),
+        "altitude": None if data.get("altitude") is None else float(data.get("altitude")),
+        "ts_utc": ts.strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+def parse_open_notify(data):
+    ts = datetime.utcfromtimestamp(int(data.get("timestamp", time.time())))
+    pos = data.get("iss_position", {})
+    return {
+        "latitude": float(pos.get("latitude")),
+        "longitude": float(pos.get("longitude")),
+        "altitude": None,
+        "ts_utc": ts.strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+def fetch_iss_position_once():
+    try:
+        resp = requests.get(API_URL, timeout=8)
+        resp.raise_for_status()
+        data = resp.json()
+        if isinstance(data, dict) and data.get("iss_position"):
+            return parse_open_notify(data)
+        else:
+            return parse_wther_resp(data)
+    except Exception as e:
+        logger.warning("Fetch error: %s", e)
+        return None
+
+# ---------- Background collection ----------
+stop_event = Event()
+collector_started = False
+
+def background_loop():
+    logger.info("Background collector started (interval %ss)", FETCH_INTERVAL)
+    cleanup_counter = 0
+    while not stop_event.is_set():
+        pos = fetch_iss_position_once()
+        if pos:
+            try:
+                save_position(pos["latitude"], pos["longitude"], pos["altitude"], pos["ts_utc"])
+            except Exception as e:
+                logger.exception("Failed to save position: %s", e)
+            count = get_record_count()
+            if count and count % 3600 == 0:
+                logger.info("Collected %d records (~%0.2f days)", count, count / 86400.0)
+        else:
+            logger.debug("No position returned this cycle")
+
+        cleanup_counter += 1
+        # cleanup every ~3600 records worth of intervals (approx hourly if interval small)
         try:
-            res = requests.get("https://api.wheretheiss.at/v1/satellites/25544", timeout=10)
-            if res.status_code == 200:
-                iss = res.json()
-                record = {
-                    "id": len(data["days"][day_label]) + 1,
-                    "ts_utc": datetime.datetime.utcfromtimestamp(iss['timestamp']).strftime('%Y-%m-%d %H:%M:%S'),
-                    "day": day_label,
-                    "latitude": iss.get('latitude'),
-                    "longitude": iss.get('longitude'),
-                    "altitude": iss.get('altitude', None)
-                }
-                data["days"][day_label].append(record)
-                # Save to file (persist across restarts)
-                with open(DATA_FILE, 'w') as f:
-                    json.dump(data, f, indent=2)
-        except Exception as e:
-            # keep background alive and log error
-            print("Error fetching ISS data:", e)
+            threshold = max(1, int(3600 / max(1, FETCH_INTERVAL)))
+        except Exception:
+            threshold = 3600
+        if cleanup_counter >= threshold:
+            try:
+                cleanup_old_data()
+            except Exception:
+                logger.exception("Cleanup failed")
+            cleanup_counter = 0
 
-        time.sleep(FETCH_INTERVAL)
+        # wait with ability to cancel quickly
+        stop_event.wait(FETCH_INTERVAL)
 
-# ---------------- API routes ----------------
-
-@app.route('/api/last3days')
-def last3days():
-    """Return last 3 days data for charts (chronological)."""
-    # sort day labels by their numeric part to preserve order Day 1, Day 2, ...
-    day_labels = sorted(data["days"].keys(), key=lambda s: int(s.split()[1]) if s.split()[1].isdigit() else s)
-    # take last 3 labels if more exist
-    day_labels = day_labels[-3:]
-    all_records = []
-    for dl in day_labels:
-        all_records.extend(data["days"].get(dl, []))
-    return jsonify(all_records)
-
-@app.route('/api/all-records')
-def all_records():
-    """Return records for selected day (or latest if none). Also return available_days."""
-    per_page = int(request.args.get('per_page', RECORDS_PER_DAY))
-    day = request.args.get('day')
-    # determine available days in numeric order
-    available_days = sorted(data["days"].keys(), key=lambda s: int(s.split()[1]) if s.split()[1].isdigit() else s)
-    if not day:
-        day = available_days[-1] if available_days else ''
-    records = data["days"].get(day, [])[:per_page]
-    return jsonify({"records": records, "available_days": available_days})
-
-@app.route('/api/download-csv')
-def download_csv():
-    """Download CSV for selected day or all days."""
-    all_flag = request.args.get('all') == '1' or request.args.get('all') == 'true'
-    day = request.args.get('day')
-    filename = f"iss_data_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
-    rows = []
-
-    if all_flag:
-        # flatten all days in numeric order
-        for dl in sorted(data["days"].keys(), key=lambda s: int(s.split()[1]) if s.split()[1].isdigit() else s):
-            rows.extend(data["days"].get(dl, []))
-    elif day and day in data["days"]:
-        rows = data["days"][day]
-
-    if not rows:
-        return "No data available", 404
-
-    # Create CSV on disk (small and temporary)
-    with open(filename, 'w', newline='') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=["id","ts_utc","day","latitude","longitude","altitude"])
-        writer.writeheader()
-        for r in rows:
-            writer.writerow(r)
-
-    # send and let the platform / OS clean up later if you want; or optionally delete after send
-    return send_file(filename, as_attachment=True)
-
-# ---------------- Serve HTML in root (no templates folder) ----------------
-
-@app.route('/')
-def index():
-    # serve index.html from the current working directory (root)
-    return send_from_directory(os.getcwd(), 'index.html')
-
-@app.route('/database')
-def database():
-    # serve database.html from the current working directory (root)
-    return send_from_directory(os.getcwd(), 'database.html')
-
-# Optional: serve any root-level static file (if you reference /somefile.js)
-@app.route('/<path:filename>')
-def root_static(filename):
-    # but avoid exposing sensitive files - we only serve if file exists in cwd
-    full = os.path.join(os.getcwd(), filename)
-    if os.path.exists(full):
-        return send_from_directory(os.getcwd(), filename)
-    return "File not found", 404
-
-# ---------------- Startup ----------------
-
-if __name__ == '__main__':
-    # Start background fetch thread
-    t = Thread(target=fetch_iss_data, daemon=True)
+def start_collector_thread():
+    global collector_started
+    if collector_started:
+        return
+    collector_started = True
+    t = Thread(target=background_loop, daemon=True)
     t.start()
-    # run Flask (in production with gunicorn use Procfile: "web: gunicorn server:app")
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+
+# ---------- API endpoints ----------
+@app.route("/")
+def index():
+    # attempt to serve index.html from repo root (static_folder=".")
+    index_path = os.path.join(os.getcwd(), "index.html")
+    if os.path.exists(index_path):
+        return send_file(index_path)
+    return "ISS Tracker API - index not found", 200
+
+@app.route("/database")
+def database_view():
+    db_path = os.path.join(os.getcwd(), "database.html")
+    if os.path.exists(db_path):
+        return send_file(db_path)
+    return "Database viewer not found", 404
+
+@app.route("/api/current")
+def api_current():
+    # try to fetch live position from API first
+    pos = fetch_iss_position_once()
+    if pos:
+        # attempt to save; ignore errors
+        try:
+            save_position(pos["latitude"], pos["longitude"], pos["altitude"], pos["ts_utc"])
+        except Exception:
+            logger.exception("saving live sample failed")
+        return jsonify(pos)
+
+    # fallback to latest stored record
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT latitude, longitude, altitude, timestamp AS ts_utc, day FROM iss_positions ORDER BY timestamp DESC LIMIT 1")
+    row = cur.fetchone()
+    conn.close()
+    if row:
+        return jsonify({
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+            "altitude": row["altitude"],
+            "ts_utc": row["ts_utc"],
+            "day": row["day"]
+        })
+    return jsonify({"error": "No data available"}), 404
+
+@app.route("/api/last3days")
+def api_last3days():
+    conn = get_conn()
+    cur = conn.cursor()
+    cutoff = (datetime.utcnow() - timedelta(days=MAX_RETENTION_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
+    cur.execute("""
+      SELECT latitude, longitude, altitude, timestamp AS ts_utc, day
+      FROM iss_positions
+      WHERE timestamp >= ?
+      ORDER BY timestamp ASC
+    """, (cutoff,))
+    rows = cur.fetchall()
+    conn.close()
+    data = [{
+        "latitude": r["latitude"],
+        "longitude": r["longitude"],
+        "altitude": r["altitude"],
+        "ts_utc": r["ts_utc"],
+        "day": r["day"]
+    } for r in rows]
+    return jsonify(data)
+
+@app.route("/api/all-records")
+def api_all_records():
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+        per_page = min(5000, max(1, int(request.args.get("per_page", 1000))))
+        day_filter = request.args.get("day", None)
+        conn = get_conn()
+        cur = conn.cursor()
+        if day_filter:
+            cur.execute("SELECT COUNT(*) FROM iss_positions WHERE day = ?", (day_filter,))
+            total = cur.fetchone()[0]
+            cur.execute("SELECT DISTINCT day FROM iss_positions ORDER BY day DESC")
+            days = [r["day"] for r in cur.fetchall()]
+            cur.execute("""
+              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day
+              FROM iss_positions
+              WHERE day = ?
+              ORDER BY timestamp DESC
+              LIMIT ? OFFSET ?
+            """, (day_filter, per_page, (page - 1) * per_page))
+        else:
+            cur.execute("SELECT COUNT(*) FROM iss_positions")
+            total = cur.fetchone()[0]
+            cur.execute("SELECT DISTINCT day FROM iss_positions ORDER BY day DESC")
+            days = [r["day"] for r in cur.fetchall()]
+            cur.execute("""
+              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day
+              FROM iss_positions
+              ORDER BY timestamp DESC
+              LIMIT ? OFFSET ?
+            """, (per_page, (page - 1) * per_page))
+        rows = cur.fetchall()
+        conn.close()
+        records = [{
+            "id": r["id"],
+            "latitude": r["latitude"],
+            "longitude": r["longitude"],
+            "altitude": r["altitude"],
+            "ts_utc": r["ts_utc"],
+            "day": r["day"]
+        } for r in rows]
+        total_pages = (total + per_page - 1) // per_page if total else 1
+        return jsonify({
+            "records": records,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": total_pages,
+            "available_days": days
+        })
+    except Exception as e:
+        logger.exception("Error in /api/all-records: %s", e)
+        return jsonify({"error": "Unable to fetch records"}), 500
+
+@app.route("/api/stats")
+def api_stats():
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM iss_positions")
+        total = cur.fetchone()[0]
+        cur.execute("SELECT day, COUNT(*) AS cnt FROM iss_positions GROUP BY day ORDER BY day DESC")
+        per_day = {r["day"]: r["cnt"] for r in cur.fetchall()}
+        conn.close()
+        total_hours = total / 3600.0
+        total_days = total_hours / 24.0
+        return jsonify({
+            "total_records": total,
+            "total_hours": round(total_hours, 2),
+            "total_days": round(total_days, 2),
+            "records_per_day": per_day,
+            "collection_interval_seconds": FETCH_INTERVAL,
+            "max_retention_days": MAX_RETENTION_DAYS
+        })
+    except Exception as e:
+        logger.exception("Error in /api/stats: %s", e)
+        return jsonify({"error": "Unable to fetch stats"}), 500
+
+# ---------- CSV download endpoint (streaming) ----------
+@app.route("/api/download-csv")
+def download_csv():
+    day_filter = request.args.get("day", None)
+    all_days = request.args.get("all", "0") == "1"
+
+    def generator():
+        conn = get_conn()
+        cur = conn.cursor()
+        if day_filter and not all_days:
+            cur.execute("""
+              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day 
+              FROM iss_positions 
+              WHERE day = ? 
+              ORDER BY timestamp ASC
+            """, (day_filter,))
+        else:
+            cur.execute("""
+              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day 
+              FROM iss_positions 
+              ORDER BY timestamp ASC
+            """)
+        yield "id,latitude,longitude,altitude,ts_utc,day\n"
+        for row in cur:
+            # Convert None altitude to empty
+            alt = "" if row["altitude"] is None else row["altitude"]
+            yield f"{row['id']},{row['latitude']},{row['longitude']},{alt},{row['ts_utc']},{row['day']}\n"
+        conn.close()
+
+    filename = f"iss_data_{day_filter if day_filter else 'all'}.csv"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"'
+    }
+    return Response(stream_with_context(generator()), mimetype="text/csv", headers=headers)
+
+# ---------- lifecycle hooks ----------
+@app.before_first_request
+def ensure_started():
+    # init DB and start background collector once (first request in each worker)
+    init_database()
+    # optional sample data generator (useful for UI testing)
+    if SAMPLE_DATA and get_record_count() == 0:
+        now = datetime.utcnow()
+        conn = get_conn()
+        cur = conn.cursor()
+        logger.info("Generating sample data (3000 records across 3 days)...")
+        for day_off in range(3):
+            day_ts = now - timedelta(days=day_off)
+            base_date = day_ts.strftime("%Y-%m-%d")
+            for i in range(1000):
+                tp = day_ts - timedelta(seconds=i)
+                lat = 45.0 + ((i % 180) - 90)
+                lon = -180.0 + ((i * 0.72) % 360)
+                alt = 408.0 + (i % 20) * 0.3
+                cur.execute("""
+                  INSERT INTO iss_positions (latitude, longitude, altitude, timestamp, day)
+                  VALUES (?, ?, ?, ?, ?)
+                """, (lat, lon, alt, tp.strftime("%Y-%m-%d %H:%M:%S"), base_date))
+        conn.commit()
+        conn.close()
+        logger.info("Sample data generated")
+
+    start_collector_thread()
+
+# ---------- main ----------
+if __name__ == "__main__":
+    logger.info("Starting ISS Tracker (DB=%s) FETCH_INTERVAL=%ss", DB_PATH, FETCH_INTERVAL)
+    init_database()
+    start_collector_thread()
+    # debug False for production; use HOST/PORT env if needed
+    app.run(host="0.0.0.0", port=PORT, debug=False)
