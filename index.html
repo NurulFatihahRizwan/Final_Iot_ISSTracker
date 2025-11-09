@@ -6,48 +6,46 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Space Grotesk',sans-serif;background:#0a0e27;color:#e8eaf6;height:100vh;overflow:hidden;position:relative;}
-body::before{content:'';position:fixed;width:200%;height:200%;top:-50%;left:-50%;z-index:-1;background: radial-gradient(circle at 20% 50%, rgba(120,119,198,0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(33,150,243,0.3), transparent 50%), radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.2), transparent 50%); animation: drift 20s ease-in-out infinite;}
-@keyframes drift{0%,100%{transform:translate(0,0) rotate(0deg);}33%{transform:translate(30px,-30px) rotate(5deg);}66%{transform:translate(-20px,20px) rotate(-5deg);} }
-
-.main-container{height:100vh;display:flex;flex-direction:column;}
-header{background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bottom:1px solid rgba(255,255,255,0.08);padding:20px 40px;display:flex;justify-content:space-between;align-items:center;z-index:1000;}
-.logo{display:flex;align-items:center;gap:12px;}
-.logo-icon{width:40px;height:40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 20px rgba(102,126,234,0.4);}
-.logo-text h1{font-size:22px;font-weight:700;letter-spacing:-0.5px;}
-.logo-text p{font-size:12px;color:rgba(232,234,246,0.5);font-weight:400;}
-.live-badge{display:flex;align-items:center;gap:8px;background: rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;}
-.live-dot{width:8px;height:8px;background:#10b981;border-radius:50%;box-shadow:0 0 10px rgba(16,185,129,0.8);animation: blink 2s ease-in-out infinite;}
-@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
-.content-wrapper{flex:1;display:grid;grid-template-columns:1fr 420px;overflow:hidden;}
-.map-container{position:relative;background:#000;}
-#map{width:100%;height:100%;}
-.analytics-sidebar{background: rgba(10,14,39,0.6);backdrop-filter:blur(20px);border-left:1px solid rgba(255,255,255,0.08);overflow-y:auto;padding:30px;}
-.analytics-sidebar::-webkit-scrollbar{width:6px;}
-.analytics-sidebar::-webkit-scrollbar-track{background:transparent;}
-.analytics-sidebar::-webkit-scrollbar-thumb{background: rgba(102,126,234,0.3);border-radius:3px;}
-.section{margin-bottom:40px;}
-.section-header{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color: rgba(232,234,246,0.5);margin-bottom:20px;display:flex;align-items:center;gap:10px;}
-.section-header::after{content:'';flex:1;height:1px;background:linear-gradient(90deg, rgba(102,126,234,0.3), transparent);}
-.chart-container{margin-bottom:30px;}
-.chart-container canvas{background:rgba(255,255,255,0.02);border-radius:12px;padding:15px;border:1px solid rgba(255,255,255,0.08);}
-.controls{display:flex;gap:10px;align-items:center;margin-top:15px;}
-#slider{flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,0.1);outline:none;-webkit-appearance:none;}
-#slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);cursor:pointer;box-shadow:0 0 10px rgba(102,126,234,0.8);}
-#slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);cursor:pointer;border:none;box-shadow:0 0 10px rgba(102,126,234,0.8);}
-#playPause{background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:white;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.3s;}
-#playPause:hover{transform:translateY(-2px);box-shadow:0 5px 20px rgba(102,126,234,0.4);}
-#liveMode{margin-left:10px;}
-.db-btn{margin-top:16px;width:100%;background:linear-gradient(135deg,#10b981,#059669);border:none;color:white;padding:12px 14px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;}
-.leaflet-popup-content-wrapper{background:rgba(10,14,39,0.95);backdrop-filter:blur(20px);border:1px solid rgba(102,126,234,0.3);border-radius:12px;color:#e8eaf6;}
-.leaflet-popup-content{margin:15px;font-size:13px;}
-.leaflet-popup-tip{background:rgba(10,14,39,0.95);border:1px solid rgba(102,126,234,0.3);}
-.popup-title{font-weight:700;font-size:16px;margin-bottom:10px;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-.popup-row{display:flex;justify-content:space-between;margin:5px 0;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);}
-.popup-row:last-child{border:none;}
-.popup-label{color:rgba(232,234,246,0.6);font-size:11px;text-transform:uppercase;letter-spacing:1px;}
-.popup-value{font-weight:600;color:#667eea;}
+* {margin:0;padding:0;box-sizing:border-box;}
+body {font-family:'Space Grotesk',sans-serif;background:#0a0e27;color:#e8eaf6;height:100vh;overflow:hidden;position:relative;}
+body::before {content:'';position:fixed;width:200%;height:200%;top:-50%;left:-50%;z-index:-1;background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.3), transparent 50%), radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.2), transparent 50%); animation: drift 20s ease-in-out infinite;}
+@keyframes drift {0%,100%{transform:translate(0,0) rotate(0deg);}33%{transform:translate(30px,-30px) rotate(5deg);}66%{transform:translate(-20px,20px) rotate(-5deg);} }
+.main-container {height:100vh;display:flex;flex-direction:column;}
+header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bottom:1px solid rgba(255,255,255,0.08);padding:20px 40px;display:flex;justify-content:space-between;align-items:center;z-index:1000;}
+.logo {display:flex;align-items:center;gap:12px;}
+.logo-icon {width:40px;height:40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 20px rgba(102,126,234,0.4);}
+.logo-text h1 {font-size:22px;font-weight:700;letter-spacing:-0.5px;}
+.logo-text p {font-size:12px;color:rgba(232,234,246,0.5);font-weight:400;}
+.live-badge {display:flex;align-items:center;gap:8px;background: rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;}
+.live-dot {width:8px;height:8px;background:#10b981;border-radius:50%;box-shadow:0 0 10px rgba(16,185,129,0.8);animation: blink 2s ease-in-out infinite;}
+@keyframes blink {0%,100%{opacity:1;}50%{opacity:0.3;}}
+.content-wrapper {flex:1;display:grid;grid-template-columns:1fr 420px;overflow:hidden;}
+.map-container {position:relative;background:#000;}
+#map {width:100%;height:100%;}
+.analytics-sidebar {background: rgba(10,14,39,0.6);backdrop-filter:blur(20px);border-left:1px solid rgba(255,255,255,0.08);overflow-y:auto;padding:30px;}
+.analytics-sidebar::-webkit-scrollbar {width:6px;}
+.analytics-sidebar::-webkit-scrollbar-track {background:transparent;}
+.analytics-sidebar::-webkit-scrollbar-thumb {background: rgba(102,126,234,0.3);border-radius:3px;}
+.section {margin-bottom:40px;}
+.section-header {font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color: rgba(232,234,246,0.5);margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.section-header::after {content:'';flex:1;height:1px;background:linear-gradient(90deg, rgba(102,126,234,0.3), transparent);}
+.chart-container {margin-bottom:30px;}
+.chart-container canvas {background:rgba(255,255,255,0.02);border-radius:12px;padding:15px;border:1px solid rgba(255,255,255,0.08);}
+.controls {display:flex;gap:10px;align-items:center;margin-top:15px;}
+#slider {flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,0.1);outline:none;-webkit-appearance:none;}
+#slider::-webkit-slider-thumb {-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);cursor:pointer;box-shadow:0 0 10px rgba(102,126,234,0.8);}
+#slider::-moz-range-thumb {width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);cursor:pointer;border:none;box-shadow:0 0 10px rgba(102,126,234,0.8);}
+#playPause {background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:white;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.3s;}
+#playPause:hover {transform:translateY(-2px);box-shadow:0 5px 20px rgba(102,126,234,0.4);}
+#liveMode {margin-left:10px;}
+.leaflet-popup-content-wrapper {background:rgba(10,14,39,0.95);backdrop-filter:blur(20px);border:1px solid rgba(102,126,234,0.3);border-radius:12px;color:#e8eaf6;}
+.leaflet-popup-content {margin:15px;font-size:13px;}
+.leaflet-popup-tip {background:rgba(10,14,39,0.95);border:1px solid rgba(102,126,234,0.3);}
+.popup-title {font-weight:700;font-size:16px;margin-bottom:10px;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.popup-row {display:flex;justify-content:space-between;margin:5px 0;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);}
+.popup-row:last-child {border:none;}
+.popup-label {color:rgba(232,234,246,0.6);font-size:11px;text-transform:uppercase;letter-spacing:1px;}
+.popup-value {font-weight:600;color:#667eea;}
 @media(max-width:1200px){.content-wrapper{grid-template-columns:1fr;grid-template-rows:1fr auto;}.analytics-sidebar{border-left:none;border-top:1px solid rgba(255,255,255,0.08);max-height:40vh;}}
 </style>
 </head>
@@ -71,7 +69,14 @@ header{background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bott
           <button id="playPause">▶ Play</button>
           <label><input type="checkbox" id="liveMode" checked> Live Mode</label>
         </div>
-        <a href="database.html" class="db-btn"><span style="font-size:18px;">📊</span><span>View Full Database</span></a>
+        <div style="margin-top:16px;">
+          <a href="/database" style="text-decoration:none;display:block;">
+            <button style="width:100%;background:linear-gradient(135deg,#10b981,#059669);border:none;color:white;padding:12px 14px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;gap:10px;">
+              <span style="font-size:18px;">📊</span>
+              <span>View All Database Records</span>
+            </button>
+          </a>
+        </div>
       </div>
       <div class="section">
         <div class="section-header">Charts</div>
@@ -98,7 +103,119 @@ header{background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bott
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-/* Keep your previous index.js logic intact */
+// ---- JS for ISS Live Tracking ----
+let map = L.map('map',{zoomControl:true, attributionControl:false}).setView([0,0],2);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}).addTo(map);
+
+let issMarker = null;
+let userMarker = null;
+let poly = L.polyline([], {color:'#667eea', weight:2.5, opacity:0.9, smoothFactor:1}).addTo(map);
+let dataPoints = [];
+let currentIndex = 0;
+let playing = false;
+
+const issIcon = L.divIcon({html:`<div style="position:relative;width:30px;height:30px;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:28px;">🛰️</div></div>`,className:'',iconSize:[30,30],iconAnchor:[15,15]});
+const userIcon = L.divIcon({html:`<div style="position:relative;width:24px;height:24px;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;background:#10b981;border-radius:50%;border:3px solid white;box-shadow:0 0 15px rgba(16,185,129,0.8);"></div></div>`,className:'',iconSize:[24,24],iconAnchor:[12,12]});
+
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const lat=pos.coords.latitude; const lon=pos.coords.longitude;
+    userMarker=L.marker([lat,lon],{icon:userIcon}).addTo(map);
+    userMarker.bindPopup(`📍 Your Location<br>Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°`);
+  }, ()=>{/* ignore geolocation errors */});
+}
+
+const chartOptions={responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(10,14,39,0.95)',titleColor:'#667eea',bodyColor:'#e8eaf6',borderColor:'rgba(102,126,234,0.3)',borderWidth:1,padding:12,displayColors:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(232,234,246,0.6)',font:{size:10}}}}};
+const latChart=new Chart(document.getElementById('latChart').getContext('2d'),{type:'line',data:{labels:[],datasets:[{label:'Latitude',data:[],borderColor:'#667eea',backgroundColor:'rgba(102,126,234,0.1)',fill:true,tension:0.4,borderWidth:2}]},options:chartOptions});
+const lonChart=new Chart(document.getElementById('lonChart').getContext('2d'),{type:'line',data:{labels:[],datasets:[{label:'Longitude',data:[],borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.1)',fill:true,tension:0.4,borderWidth:2}]},options:chartOptions});
+const altChart=new Chart(document.getElementById('altChart').getContext('2d'),{type:'line',data:{labels:[],datasets:[{label:'Altitude',data:[],borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.1)',fill:true,tension:0.4,borderWidth:2}]},options:chartOptions});
+
+const slider=document.getElementById('slider');
+const playBtn=document.getElementById('playPause');
+const liveMode=document.getElementById('liveMode');
+
+function clamp(n, lo, hi){ return Math.max(lo, Math.min(hi, n)); }
+
+async function fetchData(){
+  try{
+    const res = await fetch('/api/last3days', {cache: 'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const arr = await res.json();
+    dataPoints = Array.isArray(arr) ? arr : [];
+  } catch(err){
+    console.error('Error fetching data:', err);
+    return;
+  }
+
+  slider.max = Math.max(0, dataPoints.length - 1);
+  if (!slider.value) slider.value = 0;
+  currentIndex = clamp(currentIndex, 0, slider.max);
+
+  updateMap(currentIndex);
+  updateCharts();
+}
+
+function updateMap(index){
+  if(!dataPoints || dataPoints.length === 0) return;
+  poly.setLatLngs(dataPoints.map(p=>[Number(p.latitude), Number(p.longitude)]));
+  index = clamp(index, 0, dataPoints.length - 1);
+  const d = dataPoints[index]; if(!d) return;
+  const lat = (d.latitude == null ? 0 : Number(d.latitude));
+  const lon = (d.longitude == null ? 0 : Number(d.longitude));
+
+  if(!issMarker){ issMarker = L.marker([lat, lon], {icon: issIcon}).addTo(map); } 
+  else { issMarker.setLatLng([lat, lon]); }
+
+  const altText = (d.altitude === null || d.altitude === undefined) ? '—' : `${Number(d.altitude).toFixed(2)} km`;
+  const timeText = d.ts_utc || '';
+
+  issMarker.bindPopup(`
+    <div class="popup-title">🛰️ ISS Position</div>
+    <div class="popup-row"><span class="popup-label">Time</span><span class="popup-value">${timeText}</span></div>
+    <div class="popup-row"><span class="popup-label">Latitude</span><span class="popup-value">${d.latitude!=null?Number(d.latitude).toFixed(4)+'°':'—'}</span></div>
+    <div class="popup-row"><span class="popup-label">Longitude</span><span class="popup-value">${d.longitude!=null?Number(d.longitude).toFixed(4)+'°':'—'}</span></div>
+    <div class="popup-row"><span class="popup-label">Altitude</span><span class="popup-value">${altText}</span></div>
+  `);
+
+  if(liveMode.checked){ try { map.panTo([lat, lon], {animate:true, duration:0.5}); } catch(e) {} }
+}
+
+function updateCharts(){
+  const labels = dataPoints.map(d=>d.ts_utc || '');
+  latChart.data.labels = labels; latChart.data.datasets[0].data = dataPoints.map(d => (d.latitude == null ? null : Number(d.latitude))); latChart.update('none');
+  lonChart.data.labels = labels; lonChart.data.datasets[0].data = dataPoints.map(d => (d.longitude == null ? null : Number(d.longitude))); lonChart.update('none');
+  altChart.data.labels = labels; altChart.data.datasets[0].data = dataPoints.map(d => (d.altitude == null ? null : Number(d.altitude))); altChart.update('none');
+
+  const altChangeEl = document.getElementById('altChangeValue');
+  if(dataPoints.length >= 2){
+    const last = dataPoints[dataPoints.length - 1].altitude;
+    const prev = dataPoints[dataPoints.length - 2].altitude;
+    if(last != null && prev != null){ altChangeEl.textContent = (last-prev).toFixed(3)+' km'; }
+    else { altChangeEl.textContent = '—'; }
+  } else { altChangeEl.textContent = '—'; }
+}
+
+slider.addEventListener('input', e=>{
+  currentIndex = Number(e.target.value);
+  updateMap(currentIndex);
+});
+
+playBtn.addEventListener('click', ()=>{
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
+});
+
+async function animate(){
+  if(playing && dataPoints.length > 0){
+    currentIndex = (currentIndex + 1) % dataPoints.length;
+    slider.value = currentIndex;
+    updateMap(currentIndex);
+  }
+  requestAnimationFrame(animate);
+}
+
+animate();
+setInterval(fetchData, 1000);
 </script>
 </body>
 </html>
