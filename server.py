@@ -7,8 +7,6 @@ from datetime import datetime, timedelta
 from threading import Thread, Event
 from flask import Flask, jsonify, send_file, request, Response
 from flask_cors import CORS
-from collections import deque
-import csv  # NEW: for CSV download
 
 # ---------- Configuration ----------
 DB_PATH = os.environ.get("DB_PATH", "iss_data.db")
@@ -274,9 +272,18 @@ def api_stats():
         logger.exception("Error in /api/stats: %s", e)
         return jsonify({"error": "Unable to fetch stats"}), 500
 
-# ---------- NEW: CSV download endpoint ----------
+# ---------- CSV download endpoint ----------
 @app.route("/api/download-csv")
 def download_csv():
+    """
+    Download ISS position data as CSV
+    Query params:
+      - day: filter by specific day (YYYY-MM-DD)
+      - all: set to "1" to download all data
+    Examples:
+      /api/download-csv?all=1
+      /api/download-csv?day=2025-11-09
+    """
     day_filter = request.args.get("day", None)
     all_days = request.args.get("all", "0") == "1"
 
@@ -284,17 +291,34 @@ def download_csv():
         conn = get_conn()
         cur = conn.cursor()
         if day_filter and not all_days:
-            cur.execute("SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day FROM iss_positions WHERE day = ? ORDER BY timestamp ASC", (day_filter,))
+            cur.execute("""
+              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day 
+              FROM iss_positions 
+              WHERE day = ? 
+              ORDER BY timestamp ASC
+            """, (day_filter,))
         else:
-            cur.execute("SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day FROM iss_positions ORDER BY timestamp ASC")
+            cur.execute("""
+              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day 
+              FROM iss_positions 
+              ORDER BY timestamp ASC
+            """)
         
+        # CSV header
         yield "id,latitude,longitude,altitude,ts_utc,day\n"
+        
+        # CSV rows
         for row in cur:
             yield f"{row['id']},{row['latitude']},{row['longitude']},{row['altitude']},{row['ts_utc']},{row['day']}\n"
+        
         conn.close()
 
     filename = f"iss_data_{day_filter if day_filter else 'all'}.csv"
-    return Response(generate(), mimetype="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"})
+    return Response(
+        generate(), 
+        mimetype="text/csv", 
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # ---------- startup ----------
 if __name__ == "__main__":
