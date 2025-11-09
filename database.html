@@ -31,6 +31,7 @@ th{background: rgba(102,126,234,0.2);}
 <script>
 let currentPage=1, totalPages=1, perPage=1000;
 
+// Fetch and display paginated records
 async function fetchData(){
   const res = await fetch(`/api/all-records?page=${currentPage}&per_page=${perPage}`);
   const data = await res.json();
@@ -48,15 +49,36 @@ async function fetchData(){
   });
 }
 
-document.getElementById('prevPage').onclick=()=>{
-  if(currentPage>1){ currentPage--; fetchData(); }
-};
-document.getElementById('nextPage').onclick=()=>{
-  if(currentPage<totalPages){ currentPage++; fetchData(); }
-};
-document.getElementById('downloadCsv').onclick=()=>{
-  window.location.href='/api/all-records?page=1&per_page=5000'; // fetch max records
-};
+// CSV Download
+async function downloadCSV(){
+  // Fetch all records
+  const res = await fetch(`/api/all-records?page=1&per_page=5000`);
+  const data = await res.json();
+  const records = data.records;
+
+  if(records.length===0){ alert("No records to download!"); return; }
+
+  // Build CSV content
+  let csv = 'ID,Timestamp,Day,Latitude,Longitude,Altitude\n';
+  records.forEach(r=>{
+    csv += `${r.id},${r.ts_utc},${r.day},${r.latitude},${r.longitude},${r.altitude}\n`;
+  });
+
+  // Trigger download
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'iss_records.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('prevPage').onclick=()=>{if(currentPage>1){currentPage--;fetchData();}};
+document.getElementById('nextPage').onclick=()=>{if(currentPage<totalPages){currentPage++;fetchData();}};
+document.getElementById('downloadCsv').onclick=downloadCSV;
 
 fetchData();
 </script>
