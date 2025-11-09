@@ -37,15 +37,6 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
 .metric-label {font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:rgba(232,234,246,0.6);margin-bottom:10px;}
 .metric-value {font-size:32px;font-weight:700;background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;}
 .metric-unit {font-size:16px;color: rgba(232,234,246,0.4);font-weight:500;}
-.data-table {background: rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;}
-table {width:100%;border-collapse:collapse;}
-thead {background:linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));}
-th {padding:14px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:rgba(232,234,246,0.7);text-align:left;}
-td {padding:14px 12px;font-size:13px;color:rgba(232,234,246,0.8);border-top:1px solid rgba(255,255,255,0.05);font-weight:500;}
-tbody tr {transition:background 0.2s ease;}
-tbody tr:hover {background: rgba(102,126,234,0.08);}
-.delta-badge {background: rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);padding:4px 10px;border-radius:8px;font-weight:600;color:#10b981;display:inline-block;font-size:12px;}
-.empty-state {text-align:center;padding:40px 20px;color: rgba(232,234,246,0.4);font-size:14px;}
 .chart-container {margin-bottom:30px;}
 .chart-container canvas {background:rgba(255,255,255,0.02);border-radius:12px;padding:15px;border:1px solid rgba(255,255,255,0.08);}
 .controls {display:flex;gap:10px;align-items:center;margin-top:15px;}
@@ -78,8 +69,6 @@ tbody tr:hover {background: rgba(102,126,234,0.08);}
   <div class="content-wrapper">
     <div class="map-container"><div id="map"></div></div>
     <div class="analytics-sidebar">
-
-      <!-- Playback Controls & CSV -->
       <div class="section">
         <div class="section-header">Playback Controls</div>
         <div style="font-size:12px;color:rgba(232,234,246,0.6);margin-bottom:10px;font-weight:500;">Timeline Scrubber - Drag to view historical positions</div>
@@ -88,15 +77,17 @@ tbody tr:hover {background: rgba(102,126,234,0.08);}
           <button id="playPause">▶ Play</button>
           <label><input type="checkbox" id="liveMode" checked> Live Mode</label>
         </div>
+
         <div style="margin-top:16px;">
-          <button id="downloadCsv" style="width:100%;background:linear-gradient(135deg,#10b981,#059669);border:none;color:white;padding:12px 14px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;gap:10px;">
-            <span style="font-size:18px;">📊</span>
-            <span>Download All ISS Data CSV</span>
-          </button>
+          <a href="/database" style="text-decoration:none;display:block;">
+            <button style="width:100%;background:linear-gradient(135deg,#10b981,#059669);border:none;color:white;padding:12px 14px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;gap:10px;">
+              <span style="font-size:18px;">📊</span>
+              <span>View All Database Records</span>
+            </button>
+          </a>
         </div>
       </div>
-
-      <!-- Orbital Metrics -->
+      
       <div class="section">
         <div class="section-header">Orbital Metrics</div>
         <div class="metrics-grid">
@@ -106,8 +97,7 @@ tbody tr:hover {background: rgba(102,126,234,0.08);}
           <div class="metric-box"><div class="metric-label">Max Altitude</div><div class="metric-value"><span id="max_alt">--</span><span class="metric-unit">km</span></div></div>
         </div>
       </div>
-
-      <!-- Charts -->
+      
       <div class="section">
         <div class="section-header">Charts</div>
         <div class="chart-container">
@@ -126,31 +116,13 @@ tbody tr:hover {background: rgba(102,126,234,0.08);}
           </div>
         </div>
       </div>
-
-      <!-- Orbital Data Table -->
-      <div class="section">
-        <div class="section-header">Orbital Data</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-          <button id="prevDay" style="background:rgba(102,126,234,0.2);border:1px solid rgba(102,126,234,0.4);color:#667eea;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;">← Previous</button>
-          <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);">Day <span id="currentDay">1</span> of 3</div>
-          <button id="nextDay" style="background:rgba(102,126,234,0.2);border:1px solid rgba(102,126,234,0.4);color:#667eea;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;">Next →</button>
-        </div>
-        <div class="data-table">
-          <table>
-            <thead>
-              <tr><th>Time</th><th>Latitude</th><th>Longitude</th><th>Altitude</th></tr>
-            </thead>
-            <tbody id="dataTable"><tr><td colspan="4" class="empty-state">Loading orbital data...</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-
     </div>
   </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-// ----- Map setup -----
 let map = L.map('map',{zoomControl:true, attributionControl:false}).setView([0,0],2);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}).addTo(map);
 
@@ -161,134 +133,131 @@ let poly = L.polyline([], {color:'#667eea', weight:2.5, opacity:0.9, smoothFacto
 let dataPoints = [];
 let currentIndex = 0;
 let playing = false;
-let dayGroups = [];
 
-// ISS & User icons
-const issIcon = L.divIcon({ html: '<div style="font-size:28px;">🛰️</div>', className:'', iconSize:[30,30], iconAnchor:[15,15] });
-const userIcon = L.divIcon({ html:'<div style="width:16px;height:16px;background:#10b981;border-radius:50%;border:3px solid white;box-shadow:0 0 15px rgba(16,185,129,0.8);"></div>', className:'', iconSize:[24,24], iconAnchor:[12,12] });
+// Custom ISS icon
+const issIcon = L.divIcon({
+  html: `<div style="position:relative;width:30px;height:30px;">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:28px;">🛰️</div>
+  </div>`,
+  className: '',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15]
+});
 
-// User location
-if(navigator.geolocation){ 
-    navigator.geolocation.getCurrentPosition(pos=>{ 
-        const lat=pos.coords.latitude; 
-        const lon=pos.coords.longitude; 
-        userMarker=L.marker([lat,lon],{icon:userIcon}).addTo(map); 
-    }) 
+// User location icon
+const userIcon = L.divIcon({
+  html: `<div style="position:relative;width:24px;height:24px;">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;background:#10b981;border-radius:50%;border:3px solid white;box-shadow:0 0 15px rgba(16,185,129,0.8);"></div>
+  </div>`,
+  className: '',
+  iconSize: [24, 24],
+  iconAnchor: [12, 12]
+});
+
+// User geolocation
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    userMarker = L.marker([lat, lon], {icon: userIcon}).addTo(map);
+    userMarker.bindPopup(`📍 Your Location<br>Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°`);
+  });
 }
 
-// ----- Loading Spinner -----
-const dataTable = document.getElementById("dataTable");
-dataTable.innerHTML = '<tr><td colspan="4" class="empty-state">Loading orbital data...</td></tr>';
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: true,
+  plugins: { legend:{display:false}, tooltip:{backgroundColor:'rgba(10,14,39,0.95)', titleColor:'#667eea', bodyColor:'#e8eaf6', borderColor:'rgba(102,126,234,0.3)', borderWidth:1, padding:12, displayColors:false } },
+  scales: { x:{display:false}, y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'rgba(232,234,246,0.6)', font:{size:10}} } }
+};
 
-// Fetch ISS Data
+const latChart = new Chart(document.getElementById('latChart').getContext('2d'), {
+  type:'line', data:{labels:[], datasets:[{label:'Latitude', data:[], borderColor:'#667eea', backgroundColor:'rgba(102,126,234,0.1)', fill:true, tension:0.4, borderWidth:2}]}, options:chartOptions
+});
+const lonChart = new Chart(document.getElementById('lonChart').getContext('2d'), {
+  type:'line', data:{labels:[], datasets:[{label:'Longitude', data:[], borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.1)', fill:true, tension:0.4, borderWidth:2}]}, options:chartOptions
+});
+const altChart = new Chart(document.getElementById('altChart').getContext('2d'), {
+  type:'line', data:{labels:[], datasets:[{label:'Altitude', data:[], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', fill:true, tension:0.4, borderWidth:2}]}, options:chartOptions
+});
+
+const slider = document.getElementById('slider');
+const playBtn = document.getElementById('playPause');
+const liveMode = document.getElementById('liveMode');
+
 async function fetchData(){
-    let resp = await fetch("/api/last3days");
-    let json = await resp.json();
-    dataPoints = json;
-    dayGroups = [...new Set(dataPoints.map(d=>d.day))];
-    currentDayIndex = 0;
-
-    updateMetrics();
+  try {
+    const res = await fetch('/api/last3days');
+    dataPoints = await res.json();
+    slider.max = dataPoints.length - 1;
+    if(currentIndex >= dataPoints.length) currentIndex = dataPoints.length - 1;
+    updateMap(currentIndex);
     updateCharts();
-    updateTable();
-    document.getElementById("slider").max = dataPoints.length-1;
+    updateAnalytics();
+  } catch(err) { console.error('Error fetching data:', err); }
 }
-fetchData();
+setInterval(fetchData, 2000); // fetch every 2 seconds
 
-// ----- Playback & Live Mode -----
-const slider = document.getElementById("slider");
-const playBtn = document.getElementById("playPause");
-const liveCheckbox = document.getElementById("liveMode");
-
-slider.addEventListener("input", ()=>{ currentIndex = slider.value; updateMarker(); });
-playBtn.addEventListener("click", ()=>{ playing=!playing; playBtn.textContent=playing?'⏸ Pause':'▶ Play'; });
-liveCheckbox.addEventListener("change", ()=>{ if(liveCheckbox.checked){ currentIndex=dataPoints.length-1; updateMarker(); } });
-
-function updateMarker(){
-    if(!dataPoints[currentIndex]) return;
-    const dp = dataPoints[currentIndex];
-
-    if(!issMarker){ 
-        issMarker=L.marker([dp.latitude,dp.longitude],{icon:issIcon}).addTo(map); 
-    } else { 
-        issMarker.setLatLng([dp.latitude,dp.longitude]); 
-    }
-
-    // Limit polyline to last 500 points
-    poly.addLatLng([dp.latitude,dp.longitude]);
-    if(poly.getLatLngs().length > 500){
-        poly.setLatLngs(poly.getLatLngs().slice(-500));
-    }
-
-    map.panTo([dp.latitude,dp.longitude]);
-    slider.value = currentIndex;
+function updateMap(index){
+  if(dataPoints.length===0) return;
+  poly.setLatLngs(dataPoints.map(p=>[p.latitude,p.longitude]));
+  const d = dataPoints[index];
+  if(!issMarker){
+    issMarker = L.marker([d.latitude,d.longitude], {icon:issIcon}).addTo(map);
+  } else { issMarker.setLatLng([d.latitude,d.longitude]); }
+  
+  issMarker.bindPopup(`
+    <div class="popup-title">🛰️ ISS Position</div>
+    <div class="popup-row"><span class="popup-label">Time</span><span class="popup-value">${d.ts_utc}</span></div>
+    <div class="popup-row"><span class="popup-label">Latitude</span><span class="popup-value">${d.latitude.toFixed(4)}°</span></div>
+    <div class="popup-row"><span class="popup-label">Longitude</span><span class="popup-value">${d.longitude.toFixed(4)}°</span></div>
+    <div class="popup-row"><span class="popup-label">Altitude</span><span class="popup-value">${d.altitude.toFixed(2)} km</span></div>
+  `);
+  
+  if(liveMode.checked) map.panTo([d.latitude,d.longitude], {animate:true, duration:0.5});
 }
-
-setInterval(()=>{
-    if(playing){ currentIndex = Math.min(currentIndex+1,dataPoints.length-1); updateMarker(); }
-    if(liveCheckbox.checked){ currentIndex=dataPoints.length-1; updateMarker(); }
-},1000);
-
-// ----- Metrics -----
-function updateMetrics(){
-    if(!dataPoints.length) return;
-    let lons = dataPoints.map(d=>d.longitude);
-    let alts = dataPoints.map(d=>d.altitude).filter(a=>a!=null);
-    document.getElementById("min_lon").textContent=Math.min(...lons).toFixed(2);
-    document.getElementById("max_lon").textContent=Math.max(...lons).toFixed(2);
-    document.getElementById("min_alt").textContent=Math.min(...alts).toFixed(1);
-    document.getElementById("max_alt").textContent=Math.max(...alts).toFixed(1);
-
-    if(alts.length>1){ 
-        let diff=alts[alts.length-1]-alts[alts.length-2]; 
-        document.getElementById("altChangeValue").textContent=(diff>=0?'+':'')+diff.toFixed(2)+' km'; 
-    }
-}
-
-// ----- Charts -----
-const latChart = new Chart(document.getElementById("latChart"), {type:'line',data:{labels:[],datasets:[{label:'Latitude',data:[],borderColor:'#667eea',backgroundColor:'rgba(102,126,234,0.2)',tension:0.2}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:false},y:{beginAtZero:false}}}});
-const lonChart = new Chart(document.getElementById("lonChart"), {type:'line',data:{labels:[],datasets:[{label:'Longitude',data:[],borderColor:'#764ba2',backgroundColor:'rgba(118,75,162,0.2)',tension:0.2}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:false},y:{beginAtZero:false}}}});
-const altChart = new Chart(document.getElementById("altChart"), {type:'line',data:{labels:[],datasets:[{label:'Altitude',data:[],borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.2)',tension:0.2}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:false},y:{beginAtZero:false}}}});
 
 function updateCharts(){
-    let labels = dataPoints.map(d=>d.timestamp.split(' ')[1]);
-    latChart.data.labels=labels; latChart.data.datasets[0].data=dataPoints.map(d=>d.latitude); latChart.update();
-    lonChart.data.labels=labels; lonChart.data.datasets[0].data=dataPoints.map(d=>d.longitude); lonChart.update();
-    altChart.data.labels=labels; altChart.data.datasets[0].data=dataPoints.map(d=>d.altitude||0); altChart.update();
+  const labels = dataPoints.map(d=>d.ts_utc);
+  latChart.data.labels = labels; latChart.data.datasets[0].data = dataPoints.map(d=>d.latitude); latChart.update('none');
+  lonChart.data.labels = labels; lonChart.data.datasets[0].data = dataPoints.map(d=>d.longitude); lonChart.update('none');
+  altChart.data.labels = labels; altChart.data.datasets[0].data = dataPoints.map(d=>d.altitude); altChart.update('none');
 }
 
-// ----- Table -----
-let currentDayIndex=0;
-function updateTable(){
-    if(!dataPoints.length) return;
-    let tbody=document.getElementById("dataTable"); tbody.innerHTML='';
-
-    let currentDay=dayGroups[currentDayIndex];
-    document.getElementById("currentDay").textContent=currentDayIndex+1;
-
-    let rows=dataPoints.filter(d=>d.day===currentDay);
-    if(!rows.length){ 
-        tbody.innerHTML='<tr><td colspan="4" class="empty-state">No data for this day</td></tr>'; 
-        return; 
-    }
-
-    rows.forEach(d=>{
-        let tr=document.createElement('tr'); 
-        tr.innerHTML=`<td>${d.timestamp.split(' ')[1]}</td><td>${d.latitude.toFixed(4)}</td><td>${d.longitude.toFixed(4)}</td><td>${(d.altitude||0).toFixed(1)}</td>`; 
-        tbody.appendChild(tr);
-    });
+function updateAnalytics(){
+  if(dataPoints.length===0) return;
+  const lons = dataPoints.map(d=>d.longitude);
+  const alts = dataPoints.map(d=>d.altitude);
+  document.getElementById('min_lon').innerText=Math.min(...lons).toFixed(2);
+  document.getElementById('max_lon').innerText=Math.max(...lons).toFixed(2);
+  document.getElementById('min_alt').innerText=Math.min(...alts).toFixed(2);
+  document.getElementById('max_alt').innerText=Math.max(...alts).toFixed(2);
+  
+  // Calculate altitude change
+  if(dataPoints.length >= 2){
+    const lastAlt = alts[alts.length - 1];
+    const prevAlt = alts[alts.length - 2];
+    const change = lastAlt - prevAlt;
+    const changeText = change >= 0 ? `+${change.toFixed(3)} km ↑` : `${change.toFixed(3)} km ↓`;
+    const changeColor = change >= 0 ? '#10b981' : '#ef4444';
+    document.getElementById('altChangeValue').innerText = changeText;
+    document.getElementById('altChangeValue').style.color = changeColor;
+  }
 }
 
-// Day navigation
-document.getElementById("prevDay").addEventListener("click",()=>{
-    currentDayIndex=Math.max(currentDayIndex-1,0); updateTable(); 
-});
-document.getElementById("nextDay").addEventListener("click",()=>{
-    currentDayIndex=Math.min(currentDayIndex+1,dayGroups.length-1); updateTable(); 
-});
+slider.oninput = ()=>{ currentIndex=parseInt(slider.value); updateMap(currentIndex); };
+playBtn.onclick = ()=>{ playing=!playing; playBtn.innerHTML=playing?'⏸ Pause':'▶ Play'; };
 
-// CSV Download
-document.getElementById("downloadCsv").addEventListener("click",()=>{ window.location.href="/api/download-csv?all=1"; });
+setInterval(()=>{
+  if(playing && dataPoints.length>0){
+    currentIndex++;
+    if(currentIndex>=dataPoints.length) currentIndex=0;
+    slider.value=currentIndex;
+    updateMap(currentIndex);
+  }
+}, 500);
+
+fetchData();
 </script>
 </body>
 </html>
