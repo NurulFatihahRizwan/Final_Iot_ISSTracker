@@ -104,18 +104,18 @@ tbody tr:hover{background: rgba(102,126,234,0.08);}
 </div>
 
 <script>
-let currentDay = '';
 let perDay = 1000;
+let currentDay = '';
 let availableDays = [];
 
-async function fetchData(day='') {
-  try {
+async function fetchData(day=''){
+  try{
     let params = new URLSearchParams({ per_page: perDay });
     if(day) params.append('day', day);
-    const res = await fetch(`/api/all-records?${params}`);
+    const res = await fetch(`/api/all-records?${params.toString()}`);
     const data = await res.json();
 
-    availableDays = data.available_days;
+    availableDays = data.available_days || [];
     const daySelect = document.getElementById('daySelect');
     const prevValue = daySelect.value;
     daySelect.innerHTML = '';
@@ -123,34 +123,35 @@ async function fetchData(day='') {
       const opt = document.createElement('option');
       opt.value = d;
       opt.textContent = d;
-      if(d===prevValue) opt.selected=true;
+      if(d === prevValue) opt.selected = true;
       daySelect.appendChild(opt);
     });
 
     currentDay = day || availableDays[0] || '';
     document.getElementById('currentDay').textContent = currentDay ? `${currentDay} / 3` : '--';
-
     document.getElementById('perDay').textContent = perDay;
 
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
-    if(data.records.length===0){
-      tbody.innerHTML='<tr><td colspan="6" class="loading">No records yet</td></tr>';
+    if(data.records.length === 0){
+      tbody.innerHTML = '<tr><td colspan="6" class="loading">No records yet</td></tr>';
       return;
     }
+
     data.records.forEach(r=>{
       const tr = document.createElement('tr');
-      tr.innerHTML=`<td>#${r.id}</td>
+      tr.innerHTML = `
+        <td>#${r.id}</td>
         <td>${r.ts_utc}</td>
         <td><span class="day-badge">${r.day}</span></td>
         <td>${Number(r.latitude).toFixed(4)}°</td>
         <td>${Number(r.longitude).toFixed(4)}°</td>
-        <td>${r.altitude!==null?Number(r.altitude).toFixed(2)+' km':'—'}</td>`;
+        <td>${r.altitude!==null?Number(r.altitude).toFixed(2)+' km':'—'}</td>
+      `;
       tbody.appendChild(tr);
     });
 
     document.getElementById('dayInfo').textContent = currentDay ? `Day ${availableDays.indexOf(currentDay)+1} of 3` : 'Day -- of 3';
-
   } catch(err){
     console.error(err);
     document.getElementById('tableBody').innerHTML='<tr><td colspan="6" class="loading" style="color:#ef4444;">Error loading data</td></tr>';
@@ -159,9 +160,9 @@ async function fetchData(day='') {
 
 function downloadCSV(all=false){
   let url='/api/download-csv';
-  if(all) url+='?all=1';
-  else if(currentDay) url+='?day='+currentDay;
-  window.open(url);
+  if(all) url += '?all=1';
+  else if(currentDay) url += '?day=' + currentDay;
+  window.open(url, '_blank');
 }
 
 document.getElementById('daySelect').addEventListener('change', e=>{
@@ -172,7 +173,7 @@ document.getElementById('daySelect').addEventListener('change', e=>{
 fetchData();
 
 // Auto-refresh every 30s
-setInterval(()=>fetchData(currentDay),30000);
+setInterval(()=>fetchData(currentDay), 30000);
 </script>
 </body>
 </html>
