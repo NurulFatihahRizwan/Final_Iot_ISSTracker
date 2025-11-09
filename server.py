@@ -1,161 +1,142 @@
-from flask import Flask, jsonify, request, send_file
-from flask_cors import CORS
-import requests, sqlite3, os, csv, io, time
+import os
+import csv
+import json
+import time
+import threading
 from datetime import datetime, timedelta
+from flask import Flask, jsonify, request, send_from_directory
+
+import requests
 
 app = Flask(__name__)
-CORS(app)
 
-DB_FILE = "iss_data.db"
+# --- Configuration ---
+PER_DAY_RECORDS = 1000
 ISS_API = "https://api.wheretheiss.at/v1/satellites/25544"
-RECORDS_PER_DAY = 1000
-DAYS_TO_KEEP = 3  # store 3 days of data
+DATA_FILE = "iss_data.json"
+FETCH_INTERVAL = 1  # seconds
 
-# --- Database setup ---
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS telemetry (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts_utc TEXT,
-        day TEXT,
-        latitude REAL,
-        longitude REAL,
-        altitude REAL
-    )
-    """)
-    conn.commit()
-    conn.close()
+# --- In-memory storage ---
+data_history = {}  # {"2025-11-09": [records], "2025-11-10": [...], ...}
 
-init_db()
+# Load existing data if exists
+if os.path.exists(DATA_FILE):
+    with open(DATA_FILE, "r") as f:
+        data_history = json.load(f)
 
 # --- Helper functions ---
-def current_day_str():
+def get_today():
     return datetime.utcnow().strftime("%Y-%m-%d")
 
-def insert_record(lat, lon, alt):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    day = current_day_str()
-    c.execute("INSERT INTO telemetry (ts_utc, day, latitude, longitude, altitude) VALUES (?, ?, ?, ?, ?)",
-              (ts, day, lat, lon, alt))
-    conn.commit()
-    conn.close()
-    cleanup_old_data()
+def save_data():
+    with open(DATA_FILE, "w") as f:
+        json.dump(data_history, f)
 
-def cleanup_old_data():
-    """Keep only last 3 days"""
-    cutoff = (datetime.utcnow() - timedelta(days=DAYS_TO_KEEP)).strftime("%Y-%m-%d")
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("DELETE FROM telemetry WHERE day < ?", (cutoff,))
-    conn.commit()
-    conn.close()
-
-def fetch_last3days():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute(f"SELECT id, ts_utc, day, latitude, longitude, altitude FROM telemetry ORDER BY ts_utc ASC")
-    rows = c.fetchall()
-    conn.close()
-    data = []
-    for r in rows:
-        data.append({
-            "id": r[0],
-            "ts_utc": r[1],
-            "day": r[2],
-            "latitude": r[3],
-            "longitude": r[4],
-            "altitude": r[5]
-        })
-    return data
-
-def fetch_records(day=None, per_page=1000):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    if day:
-        c.execute("SELECT id, ts_utc, day, latitude, longitude, altitude FROM telemetry WHERE day=? ORDER BY ts_utc ASC LIMIT ?",
-                  (day, per_page))
-    else:
-        c.execute("SELECT id, ts_utc, day, latitude, longitude, altitude FROM telemetry ORDER BY ts_utc ASC LIMIT ?", (per_page,))
-    rows = c.fetchall()
-    conn.close()
-    records = []
-    days_set = set()
-    for r in rows:
-        records.append({
-            "id": r[0],
-            "ts_utc": r[1],
-            "day": r[2],
-            "latitude": r[3],
-            "longitude": r[4],
-            "altitude": r[5]
-        })
-        days_set.add(r[2])
-    available_days = sorted(list(days_set))
-    return records, available_days
-
-def generate_csv(records):
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["id", "ts_utc", "day", "latitude", "longitude", "altitude"])
-    for r in records:
-        writer.writerow([r["id"], r["ts_utc"], r["day"], r["latitude"], r["longitude"], r["altitude"]])
-    output.seek(0)
-    return output
-
-# --- Routes ---
-@app.route("/api/last3days")
-def api_last3days():
-    data = fetch_last3days()
-    return jsonify(data)
-
-@app.route("/api/all-records")
-def api_all_records():
-    day = request.args.get("day")
-    per_page = int(request.args.get("per_page", RECORDS_PER_DAY))
-    records, available_days = fetch_records(day=day, per_page=per_page)
-    return jsonify({"records": records, "available_days": available_days})
-
-@app.route("/api/download-csv")
-def api_download_csv():
-    day = request.args.get("day")
-    all_days = request.args.get("all")
-    if all_days == "1":
-        records, _ = fetch_records(per_page=100000)
-        filename = "iss_all_days.csv"
-    elif day:
-        records, _ = fetch_records(day=day, per_page=100000)
-        filename = f"iss_{day}.csv"
-    else:
-        return "Specify ?day=YYYY-MM-DD or ?all=1", 400
-    csv_file = generate_csv(records)
-    return send_file(io.BytesIO(csv_file.read().encode('utf-8')),
-                     mimetype="text/csv",
-                     download_name=filename,
-                     as_attachment=True)
-
-# --- Background task to fetch ISS every second ---
-def fetch_iss_loop():
+def fetch_iss():
     while True:
         try:
-            r = requests.get(ISS_API, timeout=5)
-            if r.status_code == 200:
-                data = r.json()
-                lat = data.get("latitude")
-                lon = data.get("longitude")
-                alt = data.get("altitude")
-                if lat is not None and lon is not None:
-                    insert_record(lat, lon, alt)
+            res = requests.get(ISS_API, timeout=5)
+            if res.status_code == 200:
+                iss_data = res.json()
+                ts = datetime.utcfromtimestamp(iss_data["timestamp"]).strftime("%Y-%m-%d %H:%M:%S")
+                today = get_today()
+
+                # Initialize day list
+                if today not in data_history:
+                    data_history[today] = []
+
+                # Limit to PER_DAY_RECORDS per day
+                if len(data_history[today]) >= PER_DAY_RECORDS:
+                    data_history[today].pop(0)
+
+                # Add new record
+                record = {
+                    "id": len(data_history[today]) + 1,
+                    "ts_utc": ts,
+                    "day": today,
+                    "latitude": iss_data.get("latitude"),
+                    "longitude": iss_data.get("longitude"),
+                    "altitude": iss_data.get("altitude")
+                }
+                data_history[today].append(record)
+                save_data()
         except Exception as e:
             print("Error fetching ISS:", e)
-        time.sleep(1)
+        time.sleep(FETCH_INTERVAL)
 
-import threading
-threading.Thread(target=fetch_iss_loop, daemon=True).start()
+# Start background thread for data fetching
+threading.Thread(target=fetch_iss, daemon=True).start()
 
-# --- Run server ---
+# --- API Routes ---
+
+@app.route("/api/last3days")
+def last_3_days():
+    """Return all records from last 3 days in chronological order"""
+    today = datetime.utcnow().date()
+    days = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(2, -1, -1)]
+    result = []
+    for d in days:
+        result.extend(data_history.get(d, []))
+    return jsonify(result)
+
+@app.route("/api/all-records")
+def all_records():
+    """Return records for a specific day or default to first available day"""
+    per_page = int(request.args.get("per_page", PER_DAY_RECORDS))
+    day = request.args.get("day", "")
+
+    available_days = sorted(data_history.keys())
+    target_day = day if day in data_history else (available_days[0] if available_days else "")
+
+    records = data_history.get(target_day, [])[:per_page]
+
+    return jsonify({
+        "records": records,
+        "available_days": available_days
+    })
+
+@app.route("/api/download-csv")
+def download_csv():
+    """Download CSV of selected day or all days"""
+    all_days = request.args.get("all", "0") == "1"
+    day = request.args.get("day", "")
+    filename = "iss_data.csv"
+
+    if all_days:
+        records = []
+        for d in sorted(data_history.keys()):
+            records.extend(data_history[d])
+    elif day in data_history:
+        records = data_history[day]
+    else:
+        return "No data for this day", 404
+
+    # Create CSV
+    csv_path = os.path.join(".", filename)
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["id","ts_utc","day","latitude","longitude","altitude"])
+        writer.writeheader()
+        for r in records:
+            writer.writerow(r)
+
+    return send_from_directory(".", filename, as_attachment=True)
+
+# --- Serve HTML pages ---
+@app.route("/")
+def index():
+    return send_from_directory(".", "index.html")
+
+@app.route("/database")
+def database():
+    return send_from_directory(".", "database.html")
+
+# Serve any other static files (CSS, JS)
+@app.route("/<path:path>")
+def static_files(path):
+    if os.path.exists(path):
+        return send_from_directory(".", path)
+    return "File not found", 404
+
+# --- Run Server ---
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(debug=True)
