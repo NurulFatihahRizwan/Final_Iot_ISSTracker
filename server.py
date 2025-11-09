@@ -12,12 +12,9 @@ from flask_cors import CORS
 # ---------- Configuration ----------
 DB_PATH = os.environ.get("DB_PATH", "iss_data.db")
 API_URL = os.environ.get("ISS_API_URL", "https://api.wheretheiss.at/v1/satellites/25544")
-# Default interval in seconds. 86s -> ~1000 samples/day.
-# To change recording frequency set environment variable FETCH_INTERVAL_SEC (seconds).
 FETCH_INTERVAL = int(os.environ.get("FETCH_INTERVAL_SEC", "86"))
 MAX_RETENTION_DAYS = int(os.environ.get("MAX_RETENTION_DAYS", "3"))
-SAMPLE_DATA = os.environ.get("SAMPLE_DATA", "0") == "1"  # set to "1" to generate sample data on first run
-# Port used by local run; Render / gunicorn will override
+SAMPLE_DATA = os.environ.get("SAMPLE_DATA", "0") == "1"
 PORT = int(os.environ.get("PORT", "10000"))
 
 # ---------- Logging ----------
@@ -25,7 +22,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("iss-tracker")
 
 # ---------- Flask app ----------
-# static_folder="." lets us serve index.html with send_file("index.html")
 app = Flask(__name__, static_folder=".")
 CORS(app)
 
@@ -56,7 +52,6 @@ def init_database():
     logger.info("Database initialized at %s", DB_PATH)
 
 def save_position(latitude, longitude, altitude, ts_utc):
-    # ts_utc must be a string "YYYY-MM-DD HH:MM:SS" in UTC
     day = ts_utc.split(" ")[0]
     conn = get_conn()
     cur = conn.cursor()
@@ -88,7 +83,6 @@ def get_record_count():
 
 # ---------- Fetching ISS ----------
 def parse_wther_resp(data):
-    # data contains timestamp (unix), latitude, longitude, altitude
     ts = datetime.utcfromtimestamp(int(data.get("timestamp", time.time())))
     return {
         "latitude": float(data.get("latitude")),
@@ -141,7 +135,6 @@ def background_loop():
             logger.debug("No position returned this cycle")
 
         cleanup_counter += 1
-        # cleanup every ~3600 records worth of intervals (approx hourly if interval small)
         try:
             threshold = max(1, int(3600 / max(1, FETCH_INTERVAL)))
         except Exception:
@@ -153,7 +146,6 @@ def background_loop():
                 logger.exception("Cleanup failed")
             cleanup_counter = 0
 
-        # wait with ability to cancel quickly
         stop_event.wait(FETCH_INTERVAL)
 
 def start_collector_thread():
@@ -167,7 +159,6 @@ def start_collector_thread():
 # ---------- API endpoints ----------
 @app.route("/")
 def index():
-    # attempt to serve index.html from repo root (static_folder=".")
     index_path = os.path.join(os.getcwd(), "index.html")
     if os.path.exists(index_path):
         return send_file(index_path)
@@ -182,17 +173,13 @@ def database_view():
 
 @app.route("/api/current")
 def api_current():
-    # try to fetch live position from API first
     pos = fetch_iss_position_once()
     if pos:
-        # attempt to save; ignore errors
         try:
             save_position(pos["latitude"], pos["longitude"], pos["altitude"], pos["ts_utc"])
         except Exception:
             logger.exception("saving live sample failed")
         return jsonify(pos)
-
-    # fallback to latest stored record
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT latitude, longitude, altitude, timestamp AS ts_utc, day FROM iss_positions ORDER BY timestamp DESC LIMIT 1")
@@ -207,28 +194,6 @@ def api_current():
             "day": row["day"]
         })
     return jsonify({"error": "No data available"}), 404
-
-@app.route("/api/last3days")
-def api_last3days():
-    conn = get_conn()
-    cur = conn.cursor()
-    cutoff = (datetime.utcnow() - timedelta(days=MAX_RETENTION_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
-    cur.execute("""
-      SELECT latitude, longitude, altitude, timestamp AS ts_utc, day
-      FROM iss_positions
-      WHERE timestamp >= ?
-      ORDER BY timestamp ASC
-    """, (cutoff,))
-    rows = cur.fetchall()
-    conn.close()
-    data = [{
-        "latitude": r["latitude"],
-        "longitude": r["longitude"],
-        "altitude": r["altitude"],
-        "ts_utc": r["ts_utc"],
-        "day": r["day"]
-    } for r in rows]
-    return jsonify(data)
 
 @app.route("/api/all-records")
 def api_all_records():
@@ -284,6 +249,39 @@ def api_all_records():
         logger.exception("Error in /api/all-records: %s", e)
         return jsonify({"error": "Unable to fetch records"}), 500
 
+@app.route("/api/download-csv")
+def download_csv():
+    day_filter = request.args.get("day", None)
+    all_days = request.args.get("all", "0") == "1"
+
+    def generator():
+        conn = get_conn()
+        cur = conn.cursor()
+        if day_filter and not all_days:
+            cur.execute("""
+              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day 
+              FROM iss_positions 
+              WHERE day = ? 
+              ORDER BY timestamp ASC
+            """, (day_filter,))
+        else:
+            cur.execute("""
+              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day 
+              FROM iss_positions 
+              ORDER BY timestamp ASC
+            """)
+        yield "id,latitude,longitude,altitude,ts_utc,day\n"
+        for row in cur:
+            alt = "" if row["altitude"] is None else row["altitude"]
+            yield f"{row['id']},{row['latitude']},{row['longitude']},{alt},{row['ts_utc']},{row['day']}\n"
+        conn.close()
+
+    filename = f"iss_data_{day_filter if day_filter else 'all'}.csv"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"'
+    }
+    return Response(stream_with_context(generator()), mimetype="text/csv", headers=headers)
+
 @app.route("/api/stats")
 def api_stats():
     try:
@@ -308,47 +306,10 @@ def api_stats():
         logger.exception("Error in /api/stats: %s", e)
         return jsonify({"error": "Unable to fetch stats"}), 500
 
-# ---------- CSV download endpoint (streaming) ----------
-@app.route("/api/download-csv")
-def download_csv():
-    day_filter = request.args.get("day", None)
-    all_days = request.args.get("all", "0") == "1"
-
-    def generator():
-        conn = get_conn()
-        cur = conn.cursor()
-        if day_filter and not all_days:
-            cur.execute("""
-              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day 
-              FROM iss_positions 
-              WHERE day = ? 
-              ORDER BY timestamp ASC
-            """, (day_filter,))
-        else:
-            cur.execute("""
-              SELECT id, latitude, longitude, altitude, timestamp AS ts_utc, day 
-              FROM iss_positions 
-              ORDER BY timestamp ASC
-            """)
-        yield "id,latitude,longitude,altitude,ts_utc,day\n"
-        for row in cur:
-            # Convert None altitude to empty
-            alt = "" if row["altitude"] is None else row["altitude"]
-            yield f"{row['id']},{row['latitude']},{row['longitude']},{alt},{row['ts_utc']},{row['day']}\n"
-        conn.close()
-
-    filename = f"iss_data_{day_filter if day_filter else 'all'}.csv"
-    headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"'
-    }
-    return Response(stream_with_context(generator()), mimetype="text/csv", headers=headers)
-
-# ---------- lifecycle hooks ----------
-@app.before_first_request
+# ---------- lifecycle hook for Flask 3.x ----------
+@app.before_serving
 def ensure_started():
-    # init DB and start background collector once (first request in each worker)
     init_database()
-    # optional sample data generator (useful for UI testing)
     if SAMPLE_DATA and get_record_count() == 0:
         now = datetime.utcnow()
         conn = get_conn()
@@ -369,7 +330,6 @@ def ensure_started():
         conn.commit()
         conn.close()
         logger.info("Sample data generated")
-
     start_collector_thread()
 
 # ---------- main ----------
@@ -377,5 +337,4 @@ if __name__ == "__main__":
     logger.info("Starting ISS Tracker (DB=%s) FETCH_INTERVAL=%ss", DB_PATH, FETCH_INTERVAL)
     init_database()
     start_collector_thread()
-    # debug False for production; use HOST/PORT env if needed
     app.run(host="0.0.0.0", port=PORT, debug=False)
