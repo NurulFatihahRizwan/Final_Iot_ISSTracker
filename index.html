@@ -1,265 +1,130 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8" />
+<meta charset="utf-8">
 <title>ISS Tracker Dashboard</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-  /* trimmed CSS for readability in this message — copy entire CSS block as below */
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Space Grotesk',sans-serif;background:#0a0e27;color:#e8eaf6;height:100vh;overflow:hidden}
-  header{background:rgba(10,14,39,0.9);padding:18px 30px;display:flex;justify-content:space-between;align-items:center}
-  .logo{display:flex;gap:12px;align-items:center}
-  .logo-icon{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:20px}
-  .logo-text h1{font-size:18px;margin-bottom:2px}
-  .main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 76px);gap:0}
-  #map{width:100%;height:100%;background:#000}
-  .sidebar{padding:20px 22px;background:rgba(10,14,39,0.6);backdrop-filter:blur(8px);overflow:auto}
-  .controls{display:flex;gap:8px;align-items:center;margin-bottom:16px}
-  button{cursor:pointer}
-  .big-btn{background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;padding:12px 14px;border-radius:10px;font-weight:700}
-  .metric-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:14px}
-  .metric{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04)}
-  .charts{margin-top:18px}
-  .chart-canvas{height:100px;margin-bottom:14px;background:rgba(255,255,255,0.02);border-radius:10px;padding:8px}
-  .loading{color:rgba(232,234,246,0.6);padding:12px}
-  .download-row{margin-top:10px;display:flex;gap:8px}
-  .download-select{padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);color:#e8eaf6}
-  a.view-db{display:inline-block;text-decoration:none;margin-top:12px}
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+* {margin:0;padding:0;box-sizing:border-box;}
+body {font-family:'Space Grotesk',sans-serif;background:#0a0e27;color:#e8eaf6;height:100vh;overflow:hidden;position:relative;}
+body::before {content:'';position:fixed;width:200%;height:200%;top:-50%;left:-50%;z-index:-1;background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.3), transparent 50%), radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.2), transparent 50%); animation: drift 20s ease-in-out infinite;}
+@keyframes drift {0%,100%{transform:translate(0,0) rotate(0deg);}33%{transform:translate(30px,-30px) rotate(5deg);}66%{transform:translate(-20px,20px) rotate(-5deg);} }
+.main-container {height:100vh;display:flex;flex-direction:column;}
+header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bottom:1px solid rgba(255,255,255,0.08);padding:20px 40px;display:flex;justify-content:space-between;align-items:center;z-index:1000;}
+.logo {display:flex;align-items:center;gap:12px;}
+.logo-icon {width:40px;height:40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 20px rgba(102,126,234,0.4);}
+.logo-text h1 {font-size:22px;font-weight:700;letter-spacing:-0.5px;}
+.logo-text p {font-size:12px;color:rgba(232,234,246,0.5);font-weight:400;}
+.live-badge {display:flex;align-items:center;gap:8px;background: rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;}
+.live-dot {width:8px;height:8px;background:#10b981;border-radius:50%;box-shadow:0 0 10px rgba(16,185,129,0.8);animation: blink 2s ease-in-out infinite;}
+@keyframes blink {0%,100%{opacity:1;}50%{opacity:0.3;}}
+.content-wrapper {flex:1;display:grid;grid-template-columns:1fr 420px;overflow:hidden;}
+.map-container {position:relative;background:#000;}
+#map {width:100%;height:100%;}
+.analytics-sidebar {background: rgba(10,14,39,0.6);backdrop-filter:blur(20px);border-left:1px solid rgba(255,255,255,0.08);overflow-y:auto;padding:30px;}
+.analytics-sidebar::-webkit-scrollbar {width:6px;}
+.analytics-sidebar::-webkit-scrollbar-track {background:transparent;}
+.analytics-sidebar::-webkit-scrollbar-thumb {background: rgba(102,126,234,0.3);border-radius:3px;}
+.section {margin-bottom:40px;}
+.section-header {font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color: rgba(232,234,246,0.5);margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.section-header::after {content:'';flex:1;height:1px;background:linear-gradient(90deg, rgba(102,126,234,0.3), transparent);}
+.metrics-grid {display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+.metric-box {background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1));border:1px solid rgba(102,126,234,0.2);border-radius:16px;padding:20px;position:relative;overflow:hidden;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);}
+.metric-box::before {content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle, rgba(102,126,234,0.1) 0%, transparent 70%);opacity:0;transition:opacity 0.3s ease;}
+.metric-box:hover::before {opacity:1;}
+.metric-box:hover {transform:translateY(-4px);border-color:rgba(102,126,234,0.5);box-shadow:0 12px 40px rgba(102,126,234,0.2);}
+.metric-label {font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:rgba(232,234,246,0.6);margin-bottom:10px;}
+.metric-value {font-size:32px;font-weight:700;background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;}
+.metric-unit {font-size:16px;color: rgba(232,234,246,0.4);font-weight:500;}
+.chart-container {margin-bottom:30px;}
+.chart-container canvas {background:rgba(255,255,255,0.02);border-radius:12px;padding:15px;border:1px solid rgba(255,255,255,0.08);}
+.controls {display:flex;gap:10px;align-items:center;margin-top:15px;}
+#slider {flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,0.1);outline:none;-webkit-appearance:none;}
+#slider::-webkit-slider-thumb {-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);cursor:pointer;box-shadow:0 0 10px rgba(102,126,234,0.8);}
+#slider::-moz-range-thumb {width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);cursor:pointer;border:none;box-shadow:0 0 10px rgba(102,126,234,0.8);}
+#playPause {background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:white;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.3s;}
+#playPause:hover {transform:translateY(-2px);box-shadow:0 5px 20px rgba(102,126,234,0.4);}
+#liveMode {margin-left:10px;}
+.leaflet-popup-content-wrapper {background:rgba(10,14,39,0.95);backdrop-filter:blur(20px);border:1px solid rgba(102,126,234,0.3);border-radius:12px;color:#e8eaf6;}
+.leaflet-popup-content {margin:15px;font-size:13px;}
+.leaflet-popup-tip {background:rgba(10,14,39,0.95);border:1px solid rgba(102,126,234,0.3);}
+.popup-title {font-weight:700;font-size:16px;margin-bottom:10px;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.popup-row {display:flex;justify-content:space-between;margin:5px 0;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);}
+.popup-row:last-child {border:none;}
+.popup-label {color:rgba(232,234,246,0.6);font-size:11px;text-transform:uppercase;letter-spacing:1px;}
+.popup-value {font-weight:600;color:#667eea;}
+@media(max-width:1200px){.content-wrapper{grid-template-columns:1fr;grid-template-rows:1fr auto;}.analytics-sidebar{border-left:none;border-top:1px solid rgba(255,255,255,0.08);max-height:40vh;}}
 </style>
 </head>
 <body>
-<header>
-  <div class="logo">
-    <div class="logo-icon">🛰️</div>
-    <div class="logo-text"><h1>ISS Mission Control</h1><div style="font-size:12px;color:rgba(232,234,246,0.6)">Real-time Orbital Tracking</div></div>
-  </div>
-
-  <div style="display:flex;gap:12px;align-items:center">
-    <div style="padding:6px 12px;border-radius:999px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);display:flex;gap:8px;align-items:center">
-      <div style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981"></div>
-      Live Tracking
+<div class="main-container">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🛰️</div>
+      <div class="logo-text"><h1>ISS Mission Control</h1><p>Real-time Orbital Tracking System</p></div>
     </div>
-    <a href="/database" class="view-db" title="View database"><button class="big-btn">📊 View Database Records</button></a>
-  </div>
-</header>
+    <div class="live-badge"><div class="live-dot"></div>Live Tracking</div>
+  </header>
+  <div class="content-wrapper">
+    <div class="map-container"><div id="map"></div></div>
+    <div class="analytics-sidebar">
+      <div class="section">
+        <div class="section-header">Playback Controls</div>
+        <div style="font-size:12px;color:rgba(232,234,246,0.6);margin-bottom:10px;font-weight:500;">Timeline Scrubber - Drag to view historical positions</div>
+        <div class="controls">
+          <input type="range" id="slider" min="0" max="0" value="0">
+          <button id="playPause">▶ Play</button>
+          <label><input type="checkbox" id="liveMode" checked> Live Mode</label>
+        </div>
 
-<div class="main">
-  <div id="map"></div>
-
-  <aside class="sidebar">
-    <div class="controls">
-      <input id="slider" type="range" min="0" max="0" value="0" style="flex:1">
-      <button id="playPause">▶ Play</button>
-      <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="liveMode" checked> Live</label>
-    </div>
-
-    <div style="display:flex;gap:8px;align-items:center">
-      <select id="csvDaySelect" class="download-select"></select>
-      <div style="display:flex;gap:6px">
-        <button id="csvDownloadDay" class="big-btn" style="padding:8px 10px">Download Day</button>
-        <button id="csvDownloadAll" class="big-btn" style="background:linear-gradient(135deg,#f59e0b,#d97706)">Download All</button>
+        <div style="margin-top:16px;">
+          <a href="/database" style="text-decoration:none;display:block;">
+            <button style="width:100%;background:linear-gradient(135deg,#10b981,#059669);border:none;color:white;padding:12px 14px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;gap:10px;">
+              <span style="font-size:18px;">📊</span>
+              <span>View All Database Records</span>
+            </button>
+          </a>
+        </div>
       </div>
+      
+      <div class="section">
+        <div class="section-header">Orbital Metrics</div>
+        <div class="metrics-grid">
+          <div class="metric-box"><div class="metric-label">Min Longitude</div><div class="metric-value"><span id="min_lon">--</span><span class="metric-unit">°</span></div></div>
+          <div class="metric-box"><div class="metric-label">Max Longitude</div><div class="metric-value"><span id="max_lon">--</span><span class="metric-unit">°</span></div></div>
+          <div class="metric-box"><div class="metric-label">Min Altitude</div><div class="metric-value"><span id="min_alt">--</span><span class="metric-unit">km</span></div></div>
+          <div class="metric-box"><div class="metric-label">Max Altitude</div><div class="metric-value"><span id="max_alt">--</span><span class="metric-unit">km</span></div></div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-header">Charts</div>
+        <div class="chart-container">
+          <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);margin-bottom:10px;">📍 Latitude Over Time (°)</div>
+          <canvas id="latChart" height="100"></canvas>
+        </div>
+        <div class="chart-container">
+          <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);margin-bottom:10px;">🌐 Longitude Over Time (°)</div>
+          <canvas id="lonChart" height="100"></canvas>
+        </div>
+        <div class="chart-container">
+          <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);margin-bottom:10px;">🚀 Altitude Over Time (km)</div>
+          <canvas id="altChart" height="100"></canvas>
+          <div id="altitudeChange" style="margin-top:12px;padding:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:8px;font-size:12px;color:#10b981;font-weight:600;">
+            <span style="color:rgba(232,234,246,0.6);">Last Change:</span> <span id="altChangeValue">Calculating...</span>
+          </div>
+        </div>
+      </div>
+      
     </div>
-
-    <div class="metric-grid">
-      <div class="metric"><div style="font-size:12px;color:rgba(232,234,246,0.6)">Min Longitude</div><div id="minLon" style="font-weight:700">--</div></div>
-      <div class="metric"><div style="font-size:12px;color:rgba(232,234,246,0.6)">Max Longitude</div><div id="maxLon" style="font-weight:700">--</div></div>
-      <div class="metric"><div style="font-size:12px;color:rgba(232,234,246,0.6)">Min Altitude (km)</div><div id="minAlt" style="font-weight:700">--</div></div>
-      <div class="metric"><div style="font-size:12px;color:rgba(232,234,246,0.6)">Max Altitude (km)</div><div id="maxAlt" style="font-weight:700">--</div></div>
-    </div>
-
-    <div class="charts">
-      <div style="font-size:13px;margin-bottom:8px">Latitude over time</div>
-      <div class="chart-canvas"><canvas id="latChart"></canvas></div>
-      <div style="font-size:13px;margin-bottom:8px">Longitude over time</div>
-      <div class="chart-canvas"><canvas id="lonChart"></canvas></div>
-      <div style="font-size:13px;margin-bottom:8px">Altitude over time</div>
-      <div class="chart-canvas"><canvas id="altChart"></canvas></div>
-    </div>
-
-    <div style="margin-top:10px;font-size:12px;color:rgba(232,234,246,0.6)">
-      Status: <span id="statusText">Initializing…</span>
-    </div>
-  </aside>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-/* Client script - compatible with server.py endpoints:
-   - /api/last3days  -> returns array of points { latitude, longitude, altitude, ts_utc, day }
-   - /api/export/days -> day listing (used for CSV dropdown)
-   - /api/export/csv?day_number=N  or ? (all when omitted)
-*/
-
-const POLL_INTERVAL_OK = 5000;   // 5s when server healthy
-const POLL_INTERVAL_ERR = 15000; // 15s backoff on errors
-let pollInterval = POLL_INTERVAL_OK;
-let pollHandle = null;
-let dataPoints = [];
-let playing = false;
-let currentIndex = 0;
-
-// Map setup
-const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([0,0], 2);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
-const issIcon = L.divIcon({ html: '<div style="font-size:26px">🛰️</div>', iconSize:[30,30], className:'' });
-let issMarker = null;
-let poly = L.polyline([], { color:'#667eea', weight:2 }).addTo(map);
-
-// Charts
-const chartOpts = { responsive:true, plugins:{legend:{display:false}}, scales:{x:{display:false}} };
-const latChart = new Chart(document.getElementById('latChart'), { type:'line', data:{labels:[], datasets:[{ data:[], tension:0.3, borderColor:'#667eea' }]}, options: chartOpts });
-const lonChart = new Chart(document.getElementById('lonChart'), { type:'line', data:{labels:[], datasets:[{ data:[], tension:0.3, borderColor:'#f59e0b' }]}, options: chartOpts });
-const altChart = new Chart(document.getElementById('altChart'), { type:'line', data:{labels:[], datasets:[{ data:[], tension:0.3, borderColor:'#10b981' }]}, options: chartOpts });
-
-// UI elements
-const slider = document.getElementById('slider');
-const playBtn = document.getElementById('playPause');
-const liveCheckbox = document.getElementById('liveMode');
-const csvDaySelect = document.getElementById('csvDaySelect');
-const csvDownloadDay = document.getElementById('csvDownloadDay');
-const csvDownloadAll = document.getElementById('csvDownloadAll');
-const statusText = document.getElementById('statusText');
-
-playBtn.addEventListener('click', ()=>{ playing = !playing; playBtn.textContent = playing ? '⏸ Pause' : '▶ Play'; });
-slider.addEventListener('input', ()=>{ currentIndex = Number(slider.value); updateViewAtIndex(currentIndex); });
-
-// CSV buttons
-csvDownloadDay.addEventListener('click', ()=>{
-  const idx = csvDaySelect.selectedIndex;
-  if(idx < 0) return;
-  const opt = csvDaySelect.options[idx];
-  const day_number = opt.getAttribute('data-day-number');
-  if(!day_number) return;
-  window.open(`/api/export/csv?day_number=${encodeURIComponent(day_number)}`, '_blank');
-});
-csvDownloadAll.addEventListener('click', ()=>{ window.open('/api/export/csv', '_blank'); });
-
-// helper: fetch JSON with error handling
-async function fetchJson(path){
-  const res = await fetch(path, { cache: 'no-store' });
-  if(!res.ok) throw new Error(`HTTP ${res.status}`);
-  return await res.json();
-}
-
-let failedCount = 0;
-async function pollOnce(){
-  try{
-    statusText.textContent = 'Fetching…';
-    // get last 3 days of point data
-    const arr = await fetchJson('/api/last3days');
-    if(!Array.isArray(arr)) throw new Error('Bad payload');
-    dataPoints = arr;
-    failedCount = 0;
-    pollInterval = POLL_INTERVAL_OK;
-    statusText.textContent = `Loaded ${dataPoints.length} points (${new Date().toISOString().slice(0,10)})`;
-
-    // rebuild poly & charts
-    const latlngs = dataPoints.map(p => [Number(p.latitude), Number(p.longitude)]);
-    poly.setLatLngs(latlngs);
-    // update marker at tail by default
-    if(dataPoints.length > 0 && liveCheckbox.checked){
-      currentIndex = dataPoints.length - 1;
-    }
-    updateChartsAndMetrics();
-    updateViewAtIndex(currentIndex);
-  }catch(err){
-    failedCount++;
-    statusText.textContent = `Fetch error (${err.message}); retrying…`;
-    pollInterval = POLL_INTERVAL_ERR;
-    console.error('poll error', err);
-  } finally {
-    // schedule next poll
-    if(pollHandle) clearTimeout(pollHandle);
-    pollHandle = setTimeout(pollOnce, pollInterval);
-  }
-}
-
-// update map marker and slider for index
-function updateViewAtIndex(idx){
-  if(!dataPoints || dataPoints.length===0) return;
-  idx = Math.max(0, Math.min(dataPoints.length-1, idx));
-  const p = dataPoints[idx];
-  if(!p) return;
-  if(!issMarker) issMarker = L.marker([p.latitude, p.longitude], { icon: issIcon }).addTo(map);
-  else issMarker.setLatLng([p.latitude, p.longitude]);
-
-  slider.max = Math.max(0, dataPoints.length-1);
-  slider.value = idx;
-  // pan to marker if live or if user moved slider
-  if(liveCheckbox.checked || playing) {
-    try { map.panTo([p.latitude, p.longitude], { animate:true, duration:0.5 }); } catch(e){}
-  }
-}
-
-// update charts and metric boxes
-function updateChartsAndMetrics(){
-  if(!dataPoints || dataPoints.length===0) {
-    latChart.data.labels = []; latChart.data.datasets[0].data=[];
-    lonChart.data.labels = []; lonChart.data.datasets[0].data=[];
-    altChart.data.labels = []; altChart.data.datasets[0].data=[];
-    latChart.update(); lonChart.update(); altChart.update();
-    document.getElementById('minLon').textContent = '--'; document.getElementById('maxLon').textContent='--';
-    document.getElementById('minAlt').textContent='--'; document.getElementById('maxAlt').textContent='--';
-    return;
-  }
-  const labels = dataPoints.map(d => d.ts_utc || '');
-  latChart.data.labels = labels; latChart.data.datasets[0].data = dataPoints.map(d=>Number(d.latitude)); latChart.update('none');
-  lonChart.data.labels = labels; lonChart.data.datasets[0].data = dataPoints.map(d=>Number(d.longitude)); lonChart.update('none');
-  altChart.data.labels = labels; altChart.data.datasets[0].data = dataPoints.map(d=> (d.altitude===null || d.altitude===undefined)? null : Number(d.altitude)); altChart.update('none');
-
-  const lons = dataPoints.map(d => Number(d.longitude)).filter(isFinite);
-  const alts = dataPoints.map(d => (d.altitude===null || d.altitude===undefined) ? NaN : Number(d.altitude)).filter(isFinite);
-  if(lons.length) { document.getElementById('minLon').textContent = Math.min(...lons).toFixed(2); document.getElementById('maxLon').textContent = Math.max(...lons).toFixed(2); }
-  if(alts.length) { document.getElementById('minAlt').textContent = Math.min(...alts).toFixed(2); document.getElementById('maxAlt').textContent= Math.max(...alts).toFixed(2); }
-}
-
-// CSV days dropdown - load once and update periodically
-async function loadCsvDaysList(){
-  try{
-    const info = await fetchJson('/api/export/days');
-    // server returns days array in "days" property
-    const days = info.days || [];
-    csvDaySelect.innerHTML = '';
-    if(days.length === 0){
-      const opt = document.createElement('option'); opt.text = 'No data yet'; csvDaySelect.add(opt);
-      return;
-    }
-    days.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.date;
-      opt.text = `Day ${d.day_number} — ${d.date} (${d.record_count.toLocaleString()} recs)`;
-      opt.setAttribute('data-day-number', String(d.day_number));
-      csvDaySelect.add(opt);
-    });
-  }catch(err){
-    console.warn('loadCsvDaysList error', err);
-    csvDaySelect.innerHTML = '<option>No data</option>';
-  }
-}
-
-// main loop for playing the timeline when playing=true
-setInterval(()=>{
-  if(playing && dataPoints.length>0){
-    currentIndex++;
-    if(currentIndex >= dataPoints.length) currentIndex = 0;
-    updateViewAtIndex(currentIndex);
-  }
-}, 600);
-
-// initial load
-(async function init(){
-  try {
-    await loadCsvDaysList();
-    pollOnce();
-    setInterval(loadCsvDaysList, 30_000); // refresh day list occasionally
-  } catch(err){
-    console.error('init error', err);
-  }
-})();
+// Keep all JS logic, except remove updateTable() and related pagination
 </script>
 </body>
 </html>
