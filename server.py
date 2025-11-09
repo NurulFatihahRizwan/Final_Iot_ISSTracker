@@ -145,7 +145,6 @@ def api_current():
     if pos:
         save_position(pos["latitude"], pos["longitude"], pos["altitude"], pos["ts_utc"])
         return jsonify(pos)
-    # fallback
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT latitude, longitude, altitude, timestamp AS ts_utc, day FROM iss_positions ORDER BY timestamp DESC LIMIT 1")
@@ -222,8 +221,15 @@ def api_download_csv():
 if __name__ == "__main__":
     logger.info("Starting ISS Tracker (DB=%s) FETCH_INTERVAL=%ss", DB_PATH, FETCH_INTERVAL)
     init_db()
+
+    # --- Immediately fetch first record ---
+    first_pos = fetch_iss_position()
+    if first_pos:
+        save_position(first_pos["latitude"], first_pos["longitude"], first_pos["altitude"], first_pos["ts_utc"])
+        logger.info("Saved first ISS record: %s", first_pos)
+
+    # --- Sample data if requested ---
     if SAMPLE_DATA and get_record_count() == 0:
-        # Generate 1000 sample records for testing
         now = datetime.utcnow()
         conn = get_conn()
         cur = conn.cursor()
@@ -238,6 +244,8 @@ if __name__ == "__main__":
         conn.close()
         logger.info("Sample data generated")
 
+    # --- Start background fetch loop ---
     t = Thread(target=background_loop, daemon=True)
     t.start()
+
     app.run(host="0.0.0.0", port=PORT, debug=False)
