@@ -3,156 +3,62 @@
 <head>
 <meta charset="utf-8">
 <title>ISS Database Viewer</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-* {margin:0;padding:0;box-sizing:border-box;}
-body {font-family:'Space Grotesk',sans-serif;background:#0a0e27;color:#e8eaf6;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
-header {background: rgba(10,14,39,0.8);backdrop-filter: blur(20px);border-bottom:1px solid rgba(255,255,255,0.08);padding:20px 40px;display:flex;justify-content:space-between;align-items:center;}
-header h1{font-size:22px;font-weight:700;}
-.container {flex:1;display:flex;flex-direction:column;padding:20px 40px;overflow:auto;}
-.controls {display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;}
-select, button {padding:8px 12px;border-radius:8px;background:rgba(10,14,39,0.8);color:#e8eaf6;border:1px solid rgba(102,126,234,0.3);cursor:pointer;font-weight:600;}
-button {background:linear-gradient(135deg,#10b981,#059669);border:none;color:white;}
-button:disabled {opacity:0.5;cursor:not-allowed;}
-.data-table {background: rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;}
-table {width:100%;border-collapse:collapse;}
-thead {background:linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));}
-th {padding:14px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:rgba(232,234,246,0.7);text-align:left;}
-td {padding:14px 12px;font-size:13px;color:rgba(232,234,246,0.8);border-top:1px solid rgba(255,255,255,0.05);font-weight:500;}
-.empty-state{text-align:center;padding:40px 20px;color: rgba(232,234,246,0.4);font-size:14px;}
-.pagination {margin-top:15px;display:flex;gap:10px;align-items:center;}
-.pagination button {background:rgba(102,126,234,0.2);color:#667eea;}
-.pagination span{font-size:13px;color:rgba(232,234,246,0.8);}
+body{background:#0a0e27;color:#e8eaf6;font-family:'Space Grotesk',sans-serif;padding:30px;}
+h1{margin-bottom:20px;}
+button{background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;}
+table{width:100%;border-collapse:collapse;margin-top:20px;}
+th,td{padding:10px;border:1px solid rgba(255,255,255,0.1);}
+th{background: rgba(102,126,234,0.2);}
+.pagination{margin-top:20px;display:flex;gap:10px;align-items:center;}
 </style>
 </head>
 <body>
-<header>
-  <h1>ISS Database Records</h1>
-  <a href="/" style="color:#10b981;text-decoration:none;font-weight:600;">← Back to Dashboard</a>
-</header>
-
-<div class="container">
-  <div class="controls">
-    <label>Filter by Day:
-      <select id="daySelect">
-        <option value="">All Days</option>
-      </select>
-    </label>
-    <button id="downloadCSV">⬇ Download CSV</button>
-  </div>
-
-  <div class="data-table">
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Timestamp</th>
-          <th>Latitude</th>
-          <th>Longitude</th>
-          <th>Altitude (km)</th>
-          <th>Day</th>
-        </tr>
-      </thead>
-      <tbody id="recordsBody">
-        <tr><td colspan="6" class="empty-state">Loading records...</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="pagination">
-    <button id="prevPage">← Previous</button>
-    <span>Page <span id="currentPage">1</span> of <span id="totalPages">1</span></span>
-    <button id="nextPage">Next →</button>
-  </div>
+<h1>ISS Database Records</h1>
+<button id="downloadCsv">📥 Download CSV</button>
+<div class="pagination">
+  <button id="prevPage">← Previous</button>
+  <span>Page <span id="currentPage">1</span> of <span id="totalPages">1</span></span>
+  <button id="nextPage">Next →</button>
 </div>
+<table>
+<thead>
+<tr><th>ID</th><th>Timestamp</th><th>Day</th><th>Latitude</th><th>Longitude</th><th>Altitude</th></tr>
+</thead>
+<tbody id="tableBody"><tr><td colspan="6">Loading...</td></tr></tbody>
+</table>
 
 <script>
-let currentPage = 1;
-let perPage = 50;
-let totalPages = 1;
-let availableDays = [];
+let currentPage=1, totalPages=1, perPage=1000;
 
-const recordsBody = document.getElementById('recordsBody');
-const currentPageSpan = document.getElementById('currentPage');
-const totalPagesSpan = document.getElementById('totalPages');
-const prevPageBtn = document.getElementById('prevPage');
-const nextPageBtn = document.getElementById('nextPage');
-const daySelect = document.getElementById('daySelect');
-const downloadCSVBtn = document.getElementById('downloadCSV');
+async function fetchData(){
+  const res = await fetch(`/api/all-records?page=${currentPage}&per_page=${perPage}`);
+  const data = await res.json();
+  totalPages = data.total_pages;
+  document.getElementById('currentPage').innerText=currentPage;
+  document.getElementById('totalPages').innerText=totalPages;
 
-async function fetchRecords(){
-  const day = daySelect.value;
-  let url = `/api/all-records?page=${currentPage}&per_page=${perPage}`;
-  if(day) url += `&day=${day}`;
-  
-  try{
-    const res = await fetch(url);
-    const data = await res.json();
-    if(data.records && data.records.length > 0){
-      recordsBody.innerHTML = '';
-      data.records.forEach(r=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${r.id}</td>
-          <td>${r.ts_utc}</td>
-          <td>${r.latitude.toFixed(4)}</td>
-          <td>${r.longitude.toFixed(4)}</td>
-          <td>${r.altitude.toFixed(2)}</td>
-          <td>${r.day}</td>
-        `;
-        recordsBody.appendChild(tr);
-      });
-    } else {
-      recordsBody.innerHTML = '<tr><td colspan="6" class="empty-state">No records found</td></tr>';
-    }
-
-    totalPages = data.total_pages || 1;
-    currentPageSpan.innerText = currentPage;
-    totalPagesSpan.innerText = totalPages;
-    prevPageBtn.disabled = currentPage === 1;
-    nextPageBtn.disabled = currentPage === totalPages;
-
-    // Populate day filter dropdown
-    if(data.available_days){
-      availableDays = data.available_days;
-      daySelect.innerHTML = `<option value="">All Days</option>`;
-      availableDays.forEach(d=>{
-        daySelect.innerHTML += `<option value="${d}">${d}</option>`;
-      });
-    }
-
-  } catch(err){
-    console.error('Error fetching records:', err);
-    recordsBody.innerHTML = '<tr><td colspan="6" class="empty-state">Error loading data</td></tr>';
-  }
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML='';
+  if(data.records.length===0){ tbody.innerHTML='<tr><td colspan="6">No data</td></tr>'; return;}
+  data.records.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.id}</td><td>${r.ts_utc}</td><td>${r.day}</td><td>${r.latitude.toFixed(4)}</td><td>${r.longitude.toFixed(4)}</td><td>${r.altitude.toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+  });
 }
 
-daySelect.onchange = ()=>{
-  currentPage = 1;
-  fetchRecords();
+document.getElementById('prevPage').onclick=()=>{
+  if(currentPage>1){ currentPage--; fetchData(); }
+};
+document.getElementById('nextPage').onclick=()=>{
+  if(currentPage<totalPages){ currentPage++; fetchData(); }
+};
+document.getElementById('downloadCsv').onclick=()=>{
+  window.location.href='/api/all-records?page=1&per_page=5000'; // fetch max records
 };
 
-prevPageBtn.onclick = ()=>{
-  if(currentPage > 1){ currentPage--; fetchRecords(); }
-};
-
-nextPageBtn.onclick = ()=>{
-  if(currentPage < totalPages){ currentPage++; fetchRecords(); }
-};
-
-downloadCSVBtn.onclick = ()=>{
-  const day = daySelect.value || 'all';
-  let url = `/api/download-csv`;
-  if(day!=='all') url += `?day=${day}`;
-  else url += '?all=1';
-  window.open(url,'_blank');
-};
-
-// Auto-refresh every 5s
-setInterval(fetchRecords, 5000);
-
-fetchRecords();
+fetchData();
 </script>
 </body>
 </html>
