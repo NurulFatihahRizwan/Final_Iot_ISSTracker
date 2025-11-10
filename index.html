@@ -10,6 +10,11 @@
 body {font-family:'Space Grotesk',sans-serif;background:#0a0e27;color:#e8eaf6;height:100vh;overflow:hidden;position:relative;}
 body::before {content:'';position:fixed;width:200%;height:200%;top:-50%;left:-50%;z-index:-1;background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.3), transparent 50%), radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.2), transparent 50%); animation: drift 20s ease-in-out infinite;}
 @keyframes drift {0%,100%{transform:translate(0,0) rotate(0deg);}33%{transform:translate(30px,-30px) rotate(5deg);}66%{transform:translate(-20px,20px) rotate(-5deg);} }
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+* {margin:0;padding:0;box-sizing:border-box;}
+body {font-family:'Space Grotesk',sans-serif;background:#0a0e27;color:#e8eaf6;height:100vh;overflow:hidden;position:relative;}
+body::before {content:'';position:fixed;width:200%;height:200%;top:-50%;left:-50%;z-index:-1;background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.3), transparent 50%), radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.2), transparent 50%); animation: drift 20s ease-in-out infinite;}
+@keyframes drift {0%,100%{transform:translate(0,0) rotate(0deg);}33%{transform:translate(30px,-30px) rotate(5deg);}66%{transform:translate(-20px,20px) rotate(-5deg);} }
 .main-container {height:100vh;display:flex;flex-direction:column;}
 header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bottom:1px solid rgba(255,255,255,0.08);padding:20px 40px;display:flex;justify-content:space-between;align-items:center;z-index:1000;}
 .logo {display:flex;align-items:center;gap:12px;}
@@ -67,16 +72,14 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
       <div class="logo-text"><h1>ISS Mission Control</h1><p>Real-time Orbital Tracking System</p></div>
     </div>
     <div class="header-right">
-      <a href="/database" class="db-button">
-        <span>📊</span>
-        <span>Database</span>
-      </a>
+      <a href="/database" class="db-button"><span>📊</span><span>Database</span></a>
       <div class="live-badge"><div class="live-dot"></div>Live Tracking</div>
     </div>
   </header>
   <div class="content-wrapper">
     <div class="map-container"><div id="map"></div></div>
     <div class="analytics-sidebar">
+      <!-- Playback Controls -->
       <div class="section">
         <div class="section-header">Playback Controls</div>
         <div style="font-size:12px;color:rgba(232,234,246,0.6);margin-bottom:10px;font-weight:500;">Timeline Scrubber - Drag to view historical positions</div>
@@ -87,6 +90,7 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
         </div>
       </div>
 
+      <!-- Orbital Metrics -->
       <div class="section">
         <div class="section-header">Orbital Metrics</div>
         <div class="metrics-grid">
@@ -97,6 +101,7 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
         </div>
       </div>
 
+      <!-- Charts -->
       <div class="section">
         <div class="section-header">Charts</div>
         <div class="chart-container">
@@ -119,131 +124,111 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
   </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
+let map = L.map('map',{zoomControl:true, attributionControl:false}).setView([0,0],2);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}).addTo(map);
+
+let issMarker = null;
+let poly = L.polyline([], {color:'#667eea', weight:2.5, opacity:0.9, smoothFactor:1}).addTo(map);
 let dataPoints = [];
 let currentIndex = 0;
 let playing = false;
+
+const issIcon = L.divIcon({html: `<div style="font-size:28px;">🛰️</div>`, className:'', iconSize:[30,30], iconAnchor:[15,15]});
+
+const chartOptions = {
+  responsive:true, maintainAspectRatio:true,
+  plugins:{
+    legend:{display:false},
+    tooltip:{backgroundColor:'rgba(10,14,39,0.95)', titleColor:'#667eea', bodyColor:'#e8eaf6', borderColor:'rgba(102,126,234,0.3)', borderWidth:1, padding:12, displayColors:false }
+  },
+  scales:{ x:{display:false}, y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'rgba(232,234,246,0.6)', font:{size:10}} } }
+};
+
+const latChart = new Chart(document.getElementById('latChart').getContext('2d'), {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#667eea', backgroundColor:'rgba(102,126,234,0.1)', fill:true, tension:0.4, borderWidth:2} ]}, options:chartOptions });
+const lonChart = new Chart(document.getElementById('lonChart').getContext('2d'), {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.1)', fill:true, tension:0.4, borderWidth:2} ]}, options:chartOptions });
+const altChart = new Chart(document.getElementById('altChart').getContext('2d'), {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', fill:true, tension:0.4, borderWidth:2} ]}, options:chartOptions });
 
 const slider = document.getElementById('slider');
 const playBtn = document.getElementById('playPause');
 const liveMode = document.getElementById('liveMode');
 
-// Chart setup
-const chartOptions = {
-  responsive:true, maintainAspectRatio:true,
-  plugins:{
-    legend:{display:false},
-    tooltip:{
-      backgroundColor:'rgba(10,14,39,0.95)',
-      titleColor:'#667eea',
-      bodyColor:'#e8eaf6',
-      borderColor:'rgba(102,126,234,0.3)',
-      borderWidth:1,
-      padding:12,
-      displayColors:false
-    }
-  },
-  scales:{
-    x:{display:false},
-    y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'rgba(232,234,246,0.6)', font:{size:10}}}
-  }
-};
-
-const latChart = new Chart(document.getElementById('latChart').getContext('2d'), {
-  type:'line', 
-  data:{labels:[], datasets:[{data:[], borderColor:'#667eea', backgroundColor:'rgba(102,126,234,0.1)', fill:true, tension:0.4, borderWidth:2}]},
-  options: chartOptions
-});
-
-const lonChart = new Chart(document.getElementById('lonChart').getContext('2d'), {
-  type:'line', 
-  data:{labels:[], datasets:[{data:[], borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.1)', fill:true, tension:0.4, borderWidth:2}]},
-  options: chartOptions
-});
-
-const altChart = new Chart(document.getElementById('altChart').getContext('2d'), {
-  type:'line', 
-  data:{labels:[], datasets:[{data:[], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', fill:true, tension:0.4, borderWidth:2}]},
-  options: chartOptions
-});
-
-// Fetch data from server every 2 seconds
 async function fetchData(){
   try {
     const res = await fetch('/api/preview');
     const json = await res.json();
-    dataPoints = (json.records || []).map(r => ({
-      latitude: parseFloat(r.latitude),
-      longitude: parseFloat(r.longitude),
-      altitude: parseFloat(r.altitude),
-      ts_myt: r.ts_myt
+    dataPoints = (json.records || []).map(d=>({
+      latitude: parseFloat(d.latitude),
+      longitude: parseFloat(d.longitude),
+      altitude: parseFloat(d.altitude),
+      ts_myt: d.ts_myt
     }));
-
-    // Update slider
-    slider.max = Math.max(dataPoints.length - 1, 0);
-    if(currentIndex >= dataPoints.length) currentIndex = dataPoints.length - 1;
-
-    // Update charts and analytics
+    slider.max = Math.max(dataPoints.length-1,0);
+    if(currentIndex >= dataPoints.length) currentIndex = dataPoints.length-1;
+    updateMap(currentIndex);
     updateCharts();
     updateAnalytics();
-  } catch(err){
-    console.error('Error fetching data:', err);
-  }
+  } catch(err){ console.error(err); }
+}
+setInterval(fetchData, 2000);
+
+function updateMap(idx){
+  if(!dataPoints.length) return;
+  poly.setLatLngs(dataPoints.map(p=>[p.latitude,p.longitude]));
+  const d = dataPoints[idx];
+  if(!issMarker) issMarker = L.marker([d.latitude,d.longitude], {icon:issIcon}).addTo(map);
+  else issMarker.setLatLng([d.latitude,d.longitude]);
+  issMarker.bindPopup(`🛰️ ISS<br>Lat: ${d.latitude.toFixed(4)}°, Lon: ${d.longitude.toFixed(4)}°, Alt: ${d.altitude.toFixed(2)} km`);
+  if(liveMode.checked) map.panTo([d.latitude,d.longitude], {animate:true, duration:0.5});
 }
 
-// Update chart values
 function updateCharts(){
   if(!dataPoints.length) return;
-
-  const labels = dataPoints.map(d => d.ts_myt);
+  const labels = dataPoints.map(d=>d.ts_myt);
   latChart.data.labels = labels;
-  latChart.data.datasets[0].data = dataPoints.map(d => d.latitude);
+  latChart.data.datasets[0].data = dataPoints.map(d=>d.latitude);
   latChart.update('none');
 
   lonChart.data.labels = labels;
-  lonChart.data.datasets[0].data = dataPoints.map(d => d.longitude);
+  lonChart.data.datasets[0].data = dataPoints.map(d=>d.longitude);
   lonChart.update('none');
 
   altChart.data.labels = labels;
-  altChart.data.datasets[0].data = dataPoints.map(d => d.altitude);
+  altChart.data.datasets[0].data = dataPoints.map(d=>d.altitude);
   altChart.update('none');
 }
 
-// Update min/max analytics
 function updateAnalytics(){
   if(!dataPoints.length) return;
   const lons = dataPoints.map(d=>d.longitude);
   const alts = dataPoints.map(d=>d.altitude);
-
   document.getElementById('min_lon').innerText = Math.min(...lons).toFixed(2);
   document.getElementById('max_lon').innerText = Math.max(...lons).toFixed(2);
   document.getElementById('min_alt').innerText = Math.min(...alts).toFixed(2);
   document.getElementById('max_alt').innerText = Math.max(...alts).toFixed(2);
 
-  if(alts.length >= 2){
+  if(alts.length>=2){
     const change = alts[alts.length-1]-alts[alts.length-2];
-    document.getElementById('altChangeValue').innerText = (change>=0?'+':'')+change.toFixed(3)+' km';
-    document.getElementById('altChangeValue').style.color = change>=0?'#10b981':'#ef4444';
+    const el = document.getElementById('altChangeValue');
+    el.innerText = (change>=0?'+':'')+change.toFixed(3)+' km';
+    el.style.color = change>=0?'#10b981':'#ef4444';
   }
 }
 
-// Playback controls
-slider.oninput = ()=>{ currentIndex=parseInt(slider.value); };
-playBtn.onclick = ()=>{ playing = !playing; playBtn.innerText = playing ? '⏸ Pause':'▶ Play'; };
+slider.oninput = ()=>{ currentIndex = parseInt(slider.value); updateMap(currentIndex); };
+playBtn.onclick = ()=>{ playing = !playing; playBtn.innerHTML = playing?'⏸ Pause':'▶ Play'; };
 
-// Auto-play
 setInterval(()=>{
   if(playing && dataPoints.length){
-    currentIndex++;
-    if(currentIndex >= dataPoints.length) currentIndex = 0;
-    slider.value = currentIndex;
+    currentIndex++; 
+    if(currentIndex >= dataPoints.length) currentIndex=0;
+    slider.value = currentIndex; 
+    updateMap(currentIndex);
   }
 },500);
 
-// Auto-refresh every 2 seconds
-setInterval(fetchData, 2000);
-
-// Initial fetch
 fetchData();
 </script>
 </body>
