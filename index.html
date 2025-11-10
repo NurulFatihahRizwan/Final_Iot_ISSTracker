@@ -119,70 +119,107 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
   </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-let map = L.map('map',{zoomControl:true, attributionControl:false}).setView([0,0],2);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}).addTo(map);
-
-let issMarker = null;
-let poly = L.polyline([], {color:'#667eea', weight:2.5, opacity:0.9, smoothFactor:1}).addTo(map);
 let dataPoints = [];
 let currentIndex = 0;
 let playing = false;
-
-const issIcon = L.divIcon({html: `<div style="font-size:28px;">🛰️</div>`, className:'', iconSize:[30,30], iconAnchor:[15,15]});
-
-const chartOptions = {
-  responsive:true, maintainAspectRatio:true,
-  plugins:{ legend:{display:false}, tooltip:{backgroundColor:'rgba(10,14,39,0.95)', titleColor:'#667eea', bodyColor:'#e8eaf6', borderColor:'rgba(102,126,234,0.3)', borderWidth:1, padding:12, displayColors:false } },
-  scales:{ x:{display:false}, y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'rgba(232,234,246,0.6)', font:{size:10}} } }
-};
-
-const latChart = new Chart(document.getElementById('latChart').getContext('2d'), {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#667eea', backgroundColor:'rgba(102,126,234,0.1)', fill:true, tension:0.4, borderWidth:2} ]}, options:chartOptions });
-const lonChart = new Chart(document.getElementById('lonChart').getContext('2d'), {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.1)', fill:true, tension:0.4, borderWidth:2} ]}, options:chartOptions });
-const altChart = new Chart(document.getElementById('altChart').getContext('2d'), {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', fill:true, tension:0.4, borderWidth:2} ]}, options:chartOptions });
 
 const slider = document.getElementById('slider');
 const playBtn = document.getElementById('playPause');
 const liveMode = document.getElementById('liveMode');
 
+// Chart setup
+const chartOptions = {
+  responsive:true, maintainAspectRatio:true,
+  plugins:{
+    legend:{display:false},
+    tooltip:{
+      backgroundColor:'rgba(10,14,39,0.95)',
+      titleColor:'#667eea',
+      bodyColor:'#e8eaf6',
+      borderColor:'rgba(102,126,234,0.3)',
+      borderWidth:1,
+      padding:12,
+      displayColors:false
+    }
+  },
+  scales:{
+    x:{display:false},
+    y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'rgba(232,234,246,0.6)', font:{size:10}}}
+  }
+};
+
+const latChart = new Chart(document.getElementById('latChart').getContext('2d'), {
+  type:'line', 
+  data:{labels:[], datasets:[{data:[], borderColor:'#667eea', backgroundColor:'rgba(102,126,234,0.1)', fill:true, tension:0.4, borderWidth:2}]},
+  options: chartOptions
+});
+
+const lonChart = new Chart(document.getElementById('lonChart').getContext('2d'), {
+  type:'line', 
+  data:{labels:[], datasets:[{data:[], borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.1)', fill:true, tension:0.4, borderWidth:2}]},
+  options: chartOptions
+});
+
+const altChart = new Chart(document.getElementById('altChart').getContext('2d'), {
+  type:'line', 
+  data:{labels:[], datasets:[{data:[], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', fill:true, tension:0.4, borderWidth:2}]},
+  options: chartOptions
+});
+
+// Fetch data from server every 2 seconds
 async function fetchData(){
   try {
     const res = await fetch('/api/preview');
     const json = await res.json();
-    dataPoints = json.records;
-    slider.max = dataPoints.length-1;
-    if(currentIndex >= dataPoints.length) currentIndex = dataPoints.length-1;
-    updateMap(currentIndex); updateCharts(); updateAnalytics();
-  } catch(err){ console.error(err); }
-}
-setInterval(fetchData, 2000);
+    dataPoints = (json.records || []).map(r => ({
+      latitude: parseFloat(r.latitude),
+      longitude: parseFloat(r.longitude),
+      altitude: parseFloat(r.altitude),
+      ts_myt: r.ts_myt
+    }));
 
-function updateMap(idx){
-  if(!dataPoints.length) return;
-  poly.setLatLngs(dataPoints.map(p=>[p.latitude,p.longitude]));
-  const d = dataPoints[idx];
-  if(!issMarker) issMarker = L.marker([d.latitude,d.longitude], {icon:issIcon}).addTo(map);
-  else issMarker.setLatLng([d.latitude,d.longitude]);
-  issMarker.bindPopup(`🛰️ ISS<br>Lat: ${d.latitude.toFixed(4)}°, Lon: ${d.longitude.toFixed(4)}°, Alt: ${d.altitude.toFixed(2)} km`);
-  if(liveMode.checked) map.panTo([d.latitude,d.longitude], {animate:true, duration:0.5});
+    // Update slider
+    slider.max = Math.max(dataPoints.length - 1, 0);
+    if(currentIndex >= dataPoints.length) currentIndex = dataPoints.length - 1;
+
+    // Update charts and analytics
+    updateCharts();
+    updateAnalytics();
+  } catch(err){
+    console.error('Error fetching data:', err);
+  }
 }
 
+// Update chart values
 function updateCharts(){
-  const labels = dataPoints.map(d=>d.ts_utc);
-  latChart.data.labels = labels; latChart.data.datasets[0].data = dataPoints.map(d=>d.latitude); latChart.update('none');
-  lonChart.data.labels = labels; lonChart.data.datasets[0].data = dataPoints.map(d=>d.longitude); lonChart.update('none');
-  altChart.data.labels = labels; altChart.data.datasets[0].data = dataPoints.map(d=>d.altitude); altChart.update('none');
+  if(!dataPoints.length) return;
+
+  const labels = dataPoints.map(d => d.ts_myt);
+  latChart.data.labels = labels;
+  latChart.data.datasets[0].data = dataPoints.map(d => d.latitude);
+  latChart.update('none');
+
+  lonChart.data.labels = labels;
+  lonChart.data.datasets[0].data = dataPoints.map(d => d.longitude);
+  lonChart.update('none');
+
+  altChart.data.labels = labels;
+  altChart.data.datasets[0].data = dataPoints.map(d => d.altitude);
+  altChart.update('none');
 }
 
+// Update min/max analytics
 function updateAnalytics(){
   if(!dataPoints.length) return;
-  const lons = dataPoints.map(d=>d.longitude), alts = dataPoints.map(d=>d.altitude);
+  const lons = dataPoints.map(d=>d.longitude);
+  const alts = dataPoints.map(d=>d.altitude);
+
   document.getElementById('min_lon').innerText = Math.min(...lons).toFixed(2);
   document.getElementById('max_lon').innerText = Math.max(...lons).toFixed(2);
   document.getElementById('min_alt').innerText = Math.min(...alts).toFixed(2);
   document.getElementById('max_alt').innerText = Math.max(...alts).toFixed(2);
+
   if(alts.length >= 2){
     const change = alts[alts.length-1]-alts[alts.length-2];
     document.getElementById('altChangeValue').innerText = (change>=0?'+':'')+change.toFixed(3)+' km';
@@ -190,16 +227,23 @@ function updateAnalytics(){
   }
 }
 
-slider.oninput = ()=>{ currentIndex=parseInt(slider.value); updateMap(currentIndex); };
-playBtn.onclick = ()=>{ playing=!playing; playBtn.innerHTML = playing?'⏸ Pause':'▶ Play'; };
+// Playback controls
+slider.oninput = ()=>{ currentIndex=parseInt(slider.value); };
+playBtn.onclick = ()=>{ playing = !playing; playBtn.innerText = playing ? '⏸ Pause':'▶ Play'; };
 
+// Auto-play
 setInterval(()=>{
   if(playing && dataPoints.length){
-    currentIndex++; if(currentIndex>=dataPoints.length) currentIndex=0;
-    slider.value=currentIndex; updateMap(currentIndex);
+    currentIndex++;
+    if(currentIndex >= dataPoints.length) currentIndex = 0;
+    slider.value = currentIndex;
   }
 },500);
 
+// Auto-refresh every 2 seconds
+setInterval(fetchData, 2000);
+
+// Initial fetch
 fetchData();
 </script>
 </body>
