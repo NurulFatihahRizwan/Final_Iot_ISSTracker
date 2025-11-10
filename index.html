@@ -1,22 +1,29 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>ISS Tracker Dashboard</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 * {margin:0;padding:0;box-sizing:border-box;}
-body {font-family:'Space Grotesk',sans-serif;background:#0a0e27;color:#e8eaf6;height:100vh;overflow:hidden;position:relative;}
-body::before {content:'';position:fixed;width:200%;height:200%;top:-50%;left:-50%;z-index:-1;background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.3), transparent 50%), radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.2), transparent 50%); animation: drift 20s ease-in-out infinite;}
+body {
+  font-family:'Space Grotesk',sans-serif;
+  background:#0a0e27;color:#e8eaf6;
+  height:100vh;overflow:hidden;position:relative;
+}
+body::before {
+  content:'';position:fixed;width:200%;height:200%;top:-50%;left:-50%;z-index:-1;
+  background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%),
+              radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.3), transparent 50%),
+              radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.2), transparent 50%);
+  animation: drift 20s ease-in-out infinite;
+}
 @keyframes drift {0%,100%{transform:translate(0,0) rotate(0deg);}33%{transform:translate(30px,-30px) rotate(5deg);}66%{transform:translate(-20px,20px) rotate(-5deg);} }
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-* {margin:0;padding:0;box-sizing:border-box;}
-body {font-family:'Space Grotesk',sans-serif;background:#0a0e27;color:#e8eaf6;height:100vh;overflow:hidden;position:relative;}
-body::before {content:'';position:fixed;width:200%;height:200%;top:-50%;left:-50%;z-index:-1;background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(33, 150, 243, 0.3), transparent 50%), radial-gradient(circle at 40% 20%, rgba(156, 39, 176, 0.2), transparent 50%); animation: drift 20s ease-in-out infinite;}
-@keyframes drift {0%,100%{transform:translate(0,0) rotate(0deg);}33%{transform:translate(30px,-30px) rotate(5deg);}66%{transform:translate(-20px,20px) rotate(-5deg);} }
+
 .main-container {height:100vh;display:flex;flex-direction:column;}
-header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bottom:1px solid rgba(255,255,255,0.08);padding:20px 40px;display:flex;justify-content:space-between;align-items:center;z-index:1000;}
+header {background: rgba(10,14,39,0.8);backdrop-filter: blur(20px);border-bottom:1px solid rgba(255,255,255,0.08);padding:20px 40px;display:flex;justify-content:space-between;align-items:center;z-index:1000;}
 .logo {display:flex;align-items:center;gap:12px;}
 .logo-icon {width:40px;height:40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 20px rgba(102,126,234,0.4);}
 .logo-text h1 {font-size:22px;font-weight:700;letter-spacing:-0.5px;}
@@ -76,6 +83,7 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
       <div class="live-badge"><div class="live-dot"></div>Live Tracking</div>
     </div>
   </header>
+
   <div class="content-wrapper">
     <div class="map-container"><div id="map"></div></div>
     <div class="analytics-sidebar">
@@ -136,7 +144,7 @@ let dataPoints = [];
 let currentIndex = 0;
 let playing = false;
 
-const issIcon = L.divIcon({html: `<div style="font-size:28px;">🛰️</div>`, className:'', iconSize:[30,30], iconAnchor:[15,15]});
+const issIcon = L.divIcon({html:`<div style="font-size:28px;">🛰️</div>`, className:'', iconSize:[30,30], iconAnchor:[15,15]});
 
 const chartOptions = {
   responsive:true, maintainAspectRatio:true,
@@ -155,24 +163,26 @@ const slider = document.getElementById('slider');
 const playBtn = document.getElementById('playPause');
 const liveMode = document.getElementById('liveMode');
 
+// Fetch API data safely
 async function fetchData(){
   try {
     const res = await fetch('/api/preview');
     const json = await res.json();
     dataPoints = (json.records || []).map(d=>({
-      latitude: parseFloat(d.latitude),
-      longitude: parseFloat(d.longitude),
-      altitude: parseFloat(d.altitude),
-      ts_myt: d.ts_myt
+      latitude: parseFloat(d.latitude) || 0,
+      longitude: parseFloat(d.longitude) || 0,
+      altitude: parseFloat(d.altitude) || 0,
+      ts_myt: d.ts_myt || ''
     }));
     slider.max = Math.max(dataPoints.length-1,0);
     if(currentIndex >= dataPoints.length) currentIndex = dataPoints.length-1;
     updateMap(currentIndex);
     updateCharts();
     updateAnalytics();
-  } catch(err){ console.error(err); }
+  } catch(err){ console.error('Failed to fetch ISS data:', err); }
 }
 setInterval(fetchData, 2000);
+fetchData();
 
 function updateMap(idx){
   if(!dataPoints.length) return;
@@ -186,7 +196,7 @@ function updateMap(idx){
 
 function updateCharts(){
   if(!dataPoints.length) return;
-  const labels = dataPoints.map(d=>d.ts_myt);
+  const labels = dataPoints.map(d=>d.ts_myt || '');
   latChart.data.labels = labels;
   latChart.data.datasets[0].data = dataPoints.map(d=>d.latitude);
   latChart.update('none');
@@ -217,7 +227,7 @@ function updateAnalytics(){
   }
 }
 
-slider.oninput = ()=>{ currentIndex = parseInt(slider.value); updateMap(currentIndex); };
+slider.oninput = ()=>{ currentIndex = parseInt(slider.value); updateMap(currentIndex); updateCharts(); updateAnalytics(); };
 playBtn.onclick = ()=>{ playing = !playing; playBtn.innerHTML = playing?'⏸ Pause':'▶ Play'; };
 
 setInterval(()=>{
@@ -226,10 +236,10 @@ setInterval(()=>{
     if(currentIndex >= dataPoints.length) currentIndex=0;
     slider.value = currentIndex; 
     updateMap(currentIndex);
+    updateCharts();
+    updateAnalytics();
   }
 },500);
-
-fetchData();
 </script>
 </body>
 </html>
