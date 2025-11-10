@@ -16,9 +16,12 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
 .logo-icon {width:40px;height:40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 20px rgba(102,126,234,0.4);}
 .logo-text h1 {font-size:22px;font-weight:700;letter-spacing:-0.5px;}
 .logo-text p {font-size:12px;color:rgba(232,234,246,0.5);font-weight:400;}
+.header-right {display:flex;align-items:center;gap:15px;}
 .live-badge {display:flex;align-items:center;gap:8px;background: rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;}
 .live-dot {width:8px;height:8px;background:#10b981;border-radius:50%;box-shadow:0 0 10px rgba(16,185,129,0.8);animation: blink 2s ease-in-out infinite;}
 @keyframes blink {0%,100%{opacity:1;}50%{opacity:0.3;}}
+.db-button {background:linear-gradient(135deg,#f59e0b,#d97706);border:none;color:white;padding:10px 20px;border-radius:10px;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.3s;text-decoration:none;display:flex;align-items:center;gap:8px;}
+.db-button:hover {transform:translateY(-2px);box-shadow:0 5px 20px rgba(245,158,11,0.4);}
 .content-wrapper {flex:1;display:grid;grid-template-columns:1fr 420px;overflow:hidden;}
 .map-container {position:relative;background:#000;}
 #map {width:100%;height:100%;}
@@ -41,8 +44,11 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
 .chart-container canvas {background:rgba(255,255,255,0.02);border-radius:12px;padding:15px;border:1px solid rgba(255,255,255,0.08);}
 .controls {display:flex;gap:10px;align-items:center;margin-top:15px;}
 #slider {flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,0.1);outline:none;-webkit-appearance:none;}
+#slider::-webkit-slider-thumb {-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);cursor:pointer;box-shadow:0 0 10px rgba(102,126,234,0.8);}
+#slider::-moz-range-thumb {width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);cursor:pointer;border:none;box-shadow:0 0 10px rgba(102,126,234,0.8);}
 #playPause {background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:white;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.3s;}
 #playPause:hover {transform:translateY(-2px);box-shadow:0 5px 20px rgba(102,126,234,0.4);}
+#liveMode {margin-left:10px;}
 .leaflet-popup-content-wrapper {background:rgba(10,14,39,0.95);backdrop-filter:blur(20px);border:1px solid rgba(102,126,234,0.3);border-radius:12px;color:#e8eaf6;}
 .leaflet-popup-content {margin:15px;font-size:13px;}
 .leaflet-popup-tip {background:rgba(10,14,39,0.95);border:1px solid rgba(102,126,234,0.3);}
@@ -51,102 +57,150 @@ header {background: rgba(10, 14, 39, 0.8);backdrop-filter: blur(20px);border-bot
 .popup-row:last-child {border:none;}
 .popup-label {color:rgba(232,234,246,0.6);font-size:11px;text-transform:uppercase;letter-spacing:1px;}
 .popup-value {font-weight:600;color:#667eea;}
-@media(max-width:1200px){.content-wrapper{grid-template-columns:1fr;grid-template-rows:1fr auto;}.analytics-sidebar{border-left:none;border-top:1px solid rgba(255,255,255,0.08);max-height:40vh;}}
 </style>
 </head>
 <body>
 <div class="main-container">
-<header>
-  <div class="logo">
-    <div class="logo-icon">🛰️</div>
-    <div class="logo-text"><h1>ISS Mission Control</h1><p>Real-time Orbital Tracking System</p></div>
-  </div>
-  <div class="live-badge"><div class="live-dot"></div>Live Tracking</div>
-</header>
-
-<div class="content-wrapper">
-  <div class="map-container"><div id="map"></div></div>
-  <div class="analytics-sidebar">
-    <div class="section">
-      <div class="section-header">Orbital Metrics</div>
-      <div class="metrics-grid">
-        <div class="metric-box"><div class="metric-label">Min Longitude</div><div class="metric-value"><span id="min_lon">--</span><span class="metric-unit">°</span></div></div>
-        <div class="metric-box"><div class="metric-label">Max Longitude</div><div class="metric-value"><span id="max_lon">--</span><span class="metric-unit">°</span></div></div>
-        <div class="metric-box"><div class="metric-label">Min Altitude</div><div class="metric-value"><span id="min_alt">--</span><span class="metric-unit">km</span></div></div>
-        <div class="metric-box"><div class="metric-label">Max Altitude</div><div class="metric-value"><span id="max_alt">--</span><span class="metric-unit">km</span></div></div>
-      </div>
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🛰️</div>
+      <div class="logo-text"><h1>ISS Mission Control</h1><p>Real-time Orbital Tracking System</p></div>
     </div>
+    <div class="header-right">
+      <a href="/database" class="db-button">
+        <span>📊</span>
+        <span>Database</span>
+      </a>
+      <div class="live-badge"><div class="live-dot"></div>Live Tracking</div>
+    </div>
+  </header>
+  <div class="content-wrapper">
+    <div class="map-container"><div id="map"></div></div>
+    <div class="analytics-sidebar">
+      <div class="section">
+        <div class="section-header">Playback Controls</div>
+        <div style="font-size:12px;color:rgba(232,234,246,0.6);margin-bottom:10px;font-weight:500;">Timeline Scrubber - Drag to view historical positions</div>
+        <div class="controls">
+          <input type="range" id="slider" min="0" max="0" value="0">
+          <button id="playPause">▶ Play</button>
+          <label><input type="checkbox" id="liveMode" checked> Live Mode</label>
+        </div>
+      </div>
 
-    <div class="section">
-      <div class="section-header">Charts</div>
-      <div class="chart-container">
-        <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);margin-bottom:10px;">📍 Latitude Over Time (°)</div>
-        <canvas id="latChart" height="100"></canvas>
+      <div class="section">
+        <div class="section-header">Orbital Metrics</div>
+        <div class="metrics-grid">
+          <div class="metric-box"><div class="metric-label">Min Longitude</div><div class="metric-value"><span id="min_lon">--</span><span class="metric-unit">°</span></div></div>
+          <div class="metric-box"><div class="metric-label">Max Longitude</div><div class="metric-value"><span id="max_lon">--</span><span class="metric-unit">°</span></div></div>
+          <div class="metric-box"><div class="metric-label">Min Altitude</div><div class="metric-value"><span id="min_alt">--</span><span class="metric-unit">km</span></div></div>
+          <div class="metric-box"><div class="metric-label">Max Altitude</div><div class="metric-value"><span id="max_alt">--</span><span class="metric-unit">km</span></div></div>
+        </div>
       </div>
-      <div class="chart-container">
-        <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);margin-bottom:10px;">🌐 Longitude Over Time (°)</div>
-        <canvas id="lonChart" height="100"></canvas>
-      </div>
-      <div class="chart-container">
-        <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);margin-bottom:10px;">🚀 Altitude Over Time (km)</div>
-        <canvas id="altChart" height="100"></canvas>
-        <div id="altitudeChange" style="margin-top:12px;padding:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:8px;font-size:12px;color:#10b981;font-weight:600;">
-          <span style="color:rgba(232,234,246,0.6);">Last Change:</span> <span id="altChangeValue">Calculating...</span>
+
+      <div class="section">
+        <div class="section-header">Charts</div>
+        <div class="chart-container">
+          <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);margin-bottom:10px;">📍 Latitude Over Time (°)</div>
+          <canvas id="latChart" height="100"></canvas>
+        </div>
+        <div class="chart-container">
+          <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);margin-bottom:10px;">🌐 Longitude Over Time (°)</div>
+          <canvas id="lonChart" height="100"></canvas>
+        </div>
+        <div class="chart-container">
+          <div style="font-size:13px;font-weight:600;color:rgba(232,234,246,0.8);margin-bottom:10px;">🚀 Altitude Over Time (km)</div>
+          <canvas id="altChart" height="100"></canvas>
+          <div id="altitudeChange" style="margin-top:12px;padding:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:8px;font-size:12px;color:#10b981;font-weight:600;">
+            <span style="color:rgba(232,234,246,0.6);">Last Change:</span> <span id="altChangeValue">Calculating...</span>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
-</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-// Initialize map
-const map = L.map('map').setView([0, 0], 2);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(map);
-const issMarker = L.circleMarker([0, 0], {radius: 8, color:'#ff0000', fillColor:'#ff4444', fillOpacity:1}).addTo(map);
+let map = L.map('map',{zoomControl:true, attributionControl:false}).setView([0,0],2);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}).addTo(map);
 
-// Initialize charts
-const latChart = new Chart(document.getElementById('latChart'), {type:'line', data:{labels:[], datasets:[{label:'Latitude', data:[], borderColor:'#667eea', backgroundColor:'rgba(102,126,234,0.2)'}]}, options:{responsive:true, plugins:{legend:{display:false}}}});
-const lonChart = new Chart(document.getElementById('lonChart'), {type:'line', data:{labels:[], datasets:[{label:'Longitude', data:[], borderColor:'#764ba2', backgroundColor:'rgba(118,75,162,0.2)'}]}, options:{responsive:true, plugins:{legend:{display:false}}}});
-const altChart = new Chart(document.getElementById('altChart'), {type:'line', data:{labels:[], datasets:[{label:'Altitude', data:[], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.2)'}]}, options:{responsive:true, plugins:{legend:{display:false}}}});
+let issMarker = null;
+let poly = L.polyline([], {color:'#667eea', weight:2.5, opacity:0.9, smoothFactor:1}).addTo(map);
+let dataPoints = [];
+let currentIndex = 0;
+let playing = false;
 
-async function fetchData() {
-    try {
-        const res = await fetch('/api/preview?day_index=0');
-        const data = await res.json();
-        const records = data.records;
-        if (!records.length) return;
+const issIcon = L.divIcon({html: `<div style="font-size:28px;">🛰️</div>`, className:'', iconSize:[30,30], iconAnchor:[15,15]});
 
-        // Update metrics
-        const lats = records.map(r => r.latitude);
-        const lons = records.map(r => r.longitude);
-        const alts = records.map(r => r.altitude).filter(a => a!==null);
+const chartOptions = {
+  responsive:true, maintainAspectRatio:true,
+  plugins:{ legend:{display:false}, tooltip:{backgroundColor:'rgba(10,14,39,0.95)', titleColor:'#667eea', bodyColor:'#e8eaf6', borderColor:'rgba(102,126,234,0.3)', borderWidth:1, padding:12, displayColors:false } },
+  scales:{ x:{display:false}, y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'rgba(232,234,246,0.6)', font:{size:10}} } }
+};
 
-        document.getElementById('min_lon').textContent = Math.min(...lons).toFixed(2);
-        document.getElementById('max_lon').textContent = Math.max(...lons).toFixed(2);
-        document.getElementById('min_alt').textContent = alts.length ? Math.min(...alts).toFixed(2) : '--';
-        document.getElementById('max_alt').textContent = alts.length ? Math.max(...alts).toFixed(2) : '--';
-        if(alts.length>1) document.getElementById('altChangeValue').textContent = (alts[alts.length-1]-alts[alts.length-2]).toFixed(2)+' km';
+const latChart = new Chart(document.getElementById('latChart').getContext('2d'), {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#667eea', backgroundColor:'rgba(102,126,234,0.1)', fill:true, tension:0.4, borderWidth:2} ]}, options:chartOptions });
+const lonChart = new Chart(document.getElementById('lonChart').getContext('2d'), {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.1)', fill:true, tension:0.4, borderWidth:2} ]}, options:chartOptions });
+const altChart = new Chart(document.getElementById('altChart').getContext('2d'), {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', fill:true, tension:0.4, borderWidth:2} ]}, options:chartOptions });
 
-        // Update charts
-        const times = records.map(r=>r.ts_utc);
-        latChart.data.labels = times; latChart.data.datasets[0].data = lats; latChart.update();
-        lonChart.data.labels = times; lonChart.data.datasets[0].data = lons; lonChart.update();
-        altChart.data.labels = times; altChart.data.datasets[0].data = alts; altChart.update();
+const slider = document.getElementById('slider');
+const playBtn = document.getElementById('playPause');
+const liveMode = document.getElementById('liveMode');
 
-        // Update map marker
-        const last = records[records.length-1];
-        issMarker.setLatLng([last.latitude, last.longitude]);
-        map.setView([last.latitude, last.longitude], 2);
+async function fetchData(){
+  try {
+    const res = await fetch('/api/preview');
+    const json = await res.json();
+    dataPoints = json.records;
+    slider.max = dataPoints.length-1;
+    if(currentIndex >= dataPoints.length) currentIndex = dataPoints.length-1;
+    updateMap(currentIndex); updateCharts(); updateAnalytics();
+  } catch(err){ console.error(err); }
+}
+setInterval(fetchData, 2000);
 
-    } catch(err){console.error('Dashboard fetch error:', err);}
+function updateMap(idx){
+  if(!dataPoints.length) return;
+  poly.setLatLngs(dataPoints.map(p=>[p.latitude,p.longitude]));
+  const d = dataPoints[idx];
+  if(!issMarker) issMarker = L.marker([d.latitude,d.longitude], {icon:issIcon}).addTo(map);
+  else issMarker.setLatLng([d.latitude,d.longitude]);
+  issMarker.bindPopup(`🛰️ ISS<br>Lat: ${d.latitude.toFixed(4)}°, Lon: ${d.longitude.toFixed(4)}°, Alt: ${d.altitude.toFixed(2)} km`);
+  if(liveMode.checked) map.panTo([d.latitude,d.longitude], {animate:true, duration:0.5});
 }
 
-// Initial fetch + interval every 15s
+function updateCharts(){
+  const labels = dataPoints.map(d=>d.ts_utc);
+  latChart.data.labels = labels; latChart.data.datasets[0].data = dataPoints.map(d=>d.latitude); latChart.update('none');
+  lonChart.data.labels = labels; lonChart.data.datasets[0].data = dataPoints.map(d=>d.longitude); lonChart.update('none');
+  altChart.data.labels = labels; altChart.data.datasets[0].data = dataPoints.map(d=>d.altitude); altChart.update('none');
+}
+
+function updateAnalytics(){
+  if(!dataPoints.length) return;
+  const lons = dataPoints.map(d=>d.longitude), alts = dataPoints.map(d=>d.altitude);
+  document.getElementById('min_lon').innerText = Math.min(...lons).toFixed(2);
+  document.getElementById('max_lon').innerText = Math.max(...lons).toFixed(2);
+  document.getElementById('min_alt').innerText = Math.min(...alts).toFixed(2);
+  document.getElementById('max_alt').innerText = Math.max(...alts).toFixed(2);
+  if(alts.length >= 2){
+    const change = alts[alts.length-1]-alts[alts.length-2];
+    document.getElementById('altChangeValue').innerText = (change>=0?'+':'')+change.toFixed(3)+' km';
+    document.getElementById('altChangeValue').style.color = change>=0?'#10b981':'#ef4444';
+  }
+}
+
+slider.oninput = ()=>{ currentIndex=parseInt(slider.value); updateMap(currentIndex); };
+playBtn.onclick = ()=>{ playing=!playing; playBtn.innerHTML = playing?'⏸ Pause':'▶ Play'; };
+
+setInterval(()=>{
+  if(playing && dataPoints.length){
+    currentIndex++; if(currentIndex>=dataPoints.length) currentIndex=0;
+    slider.value=currentIndex; updateMap(currentIndex);
+  }
+},500);
+
 fetchData();
-setInterval(fetchData, 15000);
 </script>
 </body>
 </html>
