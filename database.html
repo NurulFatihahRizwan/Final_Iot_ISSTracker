@@ -14,7 +14,7 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background: #0f0f23;
+  background: #1a1a2e; /* slightly brighter than #0f0f23 */
   color: #e5e7eb;
   min-height: 100vh;
   position: relative;
@@ -31,13 +31,13 @@ body::before {
   left: 0;
   z-index: -1;
   background: 
-    radial-gradient(ellipse at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-    radial-gradient(ellipse at 90% 70%, rgba(168, 85, 247, 0.12) 0%, transparent 40%),
-    radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
+    radial-gradient(ellipse at 10% 20%, rgba(99, 102, 241, 0.2) 0%, transparent 40%),
+    radial-gradient(ellipse at 90% 70%, rgba(168, 85, 247, 0.18) 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.12) 0%, transparent 50%);
 }
 
 header {
-  background: rgba(17, 24, 39, 0.8);
+  background: rgba(25, 29, 56, 0.85);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   padding: 24px 48px;
@@ -79,7 +79,7 @@ header {
 
 .logo-text p {
   font-size: 13px;
-  color: rgba(229, 231, 235, 0.5);
+  color: rgba(229, 231, 235, 0.6);
   font-weight: 400;
   margin-top: 2px;
 }
@@ -121,7 +121,7 @@ header {
 }
 
 .stat-card {
-  background: rgba(17, 24, 39, 0.6);
+  background: rgba(25, 29, 56, 0.65);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 28px;
@@ -159,7 +159,7 @@ header {
   justify-content: center;
   align-items: center;
   gap: 24px;
-  background: rgba(17, 24, 39, 0.6);
+  background: rgba(25, 29, 56, 0.65);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
@@ -202,7 +202,7 @@ header {
 
 /* Table Container */
 .table-container {
-  background: rgba(17, 24, 39, 0.6);
+  background: rgba(25, 29, 56, 0.65);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
@@ -239,45 +239,18 @@ tbody tr:hover {
   background: rgba(99, 102, 241, 0.08);
 }
 
-tbody tr:last-child {
-  border-bottom: none;
-}
-
 td {
   padding: 18px 24px;
   font-size: 14px;
   color: rgba(229, 231, 235, 0.9);
 }
 
-.id-col {
-  color: #6366f1;
-  font-weight: 700;
-  font-size: 13px;
-}
+.id-col { color: #6366f1; font-weight: 700; font-size: 13px; }
+.coord-col { font-family: 'Monaco', monospace; color: #fbbf24; font-weight: 500; }
+.alt-col { color: #10b981; font-weight: 700; }
+.time-col { color: rgba(229, 231, 235, 0.6); font-size: 13px; font-family: 'Monaco', monospace; }
 
-.coord-col {
-  font-family: 'Monaco', 'Courier New', monospace;
-  color: #fbbf24;
-  font-weight: 500;
-}
-
-.alt-col {
-  color: #10b981;
-  font-weight: 700;
-}
-
-.time-col {
-  color: rgba(229, 231, 235, 0.6);
-  font-size: 13px;
-  font-family: 'Monaco', 'Courier New', monospace;
-}
-
-.loading, .no-data {
-  text-align: center;
-  padding: 64px 32px;
-  color: rgba(229, 231, 235, 0.5);
-  font-size: 15px;
-}
+.loading, .no-data { text-align: center; padding: 64px 32px; color: rgba(229, 231, 235, 0.5); font-size: 15px; }
 
 /* Download Button */
 .download-button {
@@ -289,7 +262,7 @@ td {
   font-weight: 700;
   cursor: pointer;
   font-size: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s;
   display: inline-flex;
   align-items: center;
   gap: 12px;
@@ -301,28 +274,10 @@ td {
   transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
 }
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(17, 24, 39, 0.4);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.4);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.6);
-}
 </style>
 </head>
 <body>
+
 <header>
   <div class="logo">
     <div class="logo-icon">🛰️</div>
@@ -380,17 +335,26 @@ let records = [];
 let currentDayIndex = 0;
 let days = [];
 
-async function fetchAllData(){
+async function fetchAllData() {
   try {
     const res = await fetch('/api/preview');
     const data = await res.json();
-    records = data.records || [];
+    const newRecords = data.records || [];
 
-    if(records.length === 0){
+    if(newRecords.length === 0){
       document.getElementById('tableBody').innerHTML = '<tr><td colspan="5" class="no-data">No data available</td></tr>';
       document.getElementById('currentDay').innerText = '—';
+      document.getElementById('totalRecords').innerText = '0';
+      document.getElementById('totalDays').innerText = '0';
+      records = [];
+      days = [];
       return;
     }
+
+    // Check if new data added
+    const oldLatestDay = days[days.length-1];
+
+    records = newRecords;
 
     // Extract unique days
     const daySet = new Set();
@@ -401,22 +365,25 @@ async function fetchAllData(){
     });
     days = Array.from(daySet).sort();
 
-    currentDayIndex = 0;
+    // Auto switch to latest day if new day is added
+    const latestDay = days[days.length-1];
+    if(latestDay !== oldLatestDay) currentDayIndex = days.length - 1;
+
     updateSummary();
     renderTable();
-  } catch(err){
+  } catch(err) {
     console.error('Failed to fetch data:', err);
     document.getElementById('tableBody').innerHTML = '<tr><td colspan="5" class="no-data">Failed to load data</td></tr>';
   }
 }
 
-function updateSummary(){
+function updateSummary() {
   document.getElementById('totalRecords').innerText = records.length.toLocaleString();
   const uniqueDays = [...new Set(records.map(r => r.ts_myt.split(' ')[0]))];
   document.getElementById('totalDays').innerText = uniqueDays.length;
 }
 
-function renderTable(){
+function renderTable() {
   if(days.length === 0) return;
   const day = days[currentDayIndex];
   document.getElementById('currentDay').innerText = day;
@@ -453,7 +420,12 @@ function downloadCSV(){
   window.location.href = '/api/download';
 }
 
+// Initial fetch
 fetchAllData();
+
+// Auto-refresh every 30 seconds
+setInterval(fetchAllData, 30000);
 </script>
+
 </body>
 </html>
