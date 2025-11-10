@@ -1,4 +1,4 @@
-# server.py — short CSV-based ISS collector + preview + all-records
+# server.py — ISS collector with accurate UTC timestamps + preview + all-records
 from flask import Flask, jsonify, send_from_directory, request
 import requests
 import csv
@@ -12,11 +12,11 @@ DATA_FILE = 'iss_data.csv'
 FETCH_INTERVAL = 1  # seconds
 stop_event = Event()
 
-# Ensure CSV file exists with header (timestamp = unix seconds)
+# Ensure CSV file exists with header (timestamp = unix seconds + ts_utc string)
 if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['timestamp','latitude','longitude','altitude','velocity'])
+        writer.writerow(['timestamp','latitude','longitude','altitude','velocity','ts_utc'])
 
 def safe_float(v):
     try:
@@ -35,9 +35,13 @@ def fetch_iss_data():
                 longitude = safe_float(d.get('longitude'))
                 altitude = safe_float(d.get('altitude'))
                 velocity = safe_float(d.get('velocity'))
+
+                # Accurate UTC string
+                ts_utc = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+
                 with open(DATA_FILE, 'a', newline='') as f:
                     writer = csv.writer(f)
-                    writer.writerow([timestamp, latitude, longitude, altitude, velocity])
+                    writer.writerow([timestamp, latitude, longitude, altitude, velocity, ts_utc])
         except Exception as e:
             print("Error fetching ISS data:", e)
         stop_event.wait(FETCH_INTERVAL)
@@ -85,7 +89,7 @@ def api_preview():
                 vel = safe_float(row.get('velocity'))
                 records.append({
                     'timestamp': ts,
-                    'ts_utc': dt.strftime('%Y-%m-%d %H:%M:%S'),
+                    'ts_utc': row.get('ts_utc', dt.strftime('%Y-%m-%d %H:%M:%S')),
                     'latitude': lat,
                     'longitude': lon,
                     'altitude': alt,
@@ -106,11 +110,9 @@ def api_all_records():
     }
     Supports: page (1), per_page (1000), day (YYYY-MM-DD optional)
     """
-    # read CSV once into list of dicts
     if not os.path.exists(DATA_FILE):
         return jsonify({"records": [], "total": 0, "page":1, "per_page":1, "total_pages":1, "available_days": []})
 
-    # params
     try:
         page = max(1, int(request.args.get('page', 1)))
     except Exception:
@@ -134,7 +136,7 @@ def api_all_records():
             rows.append({
                 "id": i+1,
                 "timestamp": ts,
-                "ts_utc": dt.strftime('%Y-%m-%d %H:%M:%S'),
+                "ts_utc": r.get('ts_utc', dt.strftime('%Y-%m-%d %H:%M:%S')),
                 "latitude": safe_float(r.get('latitude')),
                 "longitude": safe_float(r.get('longitude')),
                 "altitude": safe_float(r.get('altitude')),
@@ -142,16 +144,10 @@ def api_all_records():
                 "day": day
             })
 
-    # total and available days (distinct days from file, newest first)
-    # rows are in file order (oldest first) — reverse to have newest first for response
     rows_sorted = sorted(rows, key=lambda x: x['timestamp'], reverse=True)
     days = sorted(list({r['day'] for r in rows}), reverse=True)
 
-    # optional day filter
-    if day_filter:
-        filtered = [r for r in rows_sorted if r['day'] == day_filter]
-    else:
-        filtered = rows_sorted
+    filtered = [r for r in rows_sorted if (day_filter is None or r['day'] == day_filter)]
 
     total = len(filtered)
     total_pages = (total + per_page - 1) // per_page if total else 1
@@ -159,7 +155,6 @@ def api_all_records():
     end = start + per_page
     page_records = filtered[start:end]
 
-    # pack records with expected field names
     out_records = [{
         "id": r["id"],
         "timestamp_unix": r["timestamp"],
@@ -185,7 +180,6 @@ def api_all_records():
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# serve database at /database to match your frontend link
 @app.route('/database')
 def serve_database():
     return send_from_directory('.', 'database.html')
