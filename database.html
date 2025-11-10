@@ -5,275 +5,40 @@
 <title>ISS Database Viewer</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter', sans-serif; background:#1a1a2e; color:#e5e7eb; min-height:100vh; position:relative; overflow-x:hidden; }
+body::before { content:''; position:fixed; width:100%; height:100%; top:0; left:0; z-index:-1;
+  background: radial-gradient(ellipse at 10% 20%, rgba(99, 102, 241, 0.2) 0%, transparent 40%),
+             radial-gradient(ellipse at 90% 70%, rgba(168, 85, 247, 0.18) 0%, transparent 40%),
+             radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.12) 0%, transparent 50%);
 }
+header { background: rgba(25,29,56,0.85); backdrop-filter: blur(20px); border-bottom:1px solid rgba(255,255,255,0.06);
+  padding:24px 48px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:1000; }
+.logo { display:flex; align-items:center; gap:16px; }
+.logo-icon { width:48px; height:48px; background:linear-gradient(135deg,#6366f1,#a855f7); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 8px 32px rgba(99,102,241,0.3); }
+.logo-text h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; background:linear-gradient(135deg,#6366f1,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.logo-text p { font-size:13px; color:rgba(229,231,235,0.6); font-weight:400; margin-top:2px; }
+.back-button { background:linear-gradient(135deg,#6366f1,#8b5cf6); border:none; color:white; padding:12px 24px; border-radius:12px; font-weight:600; cursor:pointer; font-size:14px; display:flex; align-items:center; gap:8px; text-decoration:none; }
+.container { max-width:1400px; margin:48px auto; padding:0 48px; }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:24px; margin-bottom:32px; }
+.stat-card { background:rgba(25,29,56,0.65); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); padding:28px; border-radius:16px; }
+.stat-label { font-size:13px; font-weight:600; text-transform:uppercase; color:rgba(229,231,235,0.6); margin-bottom:8px; }
+.stat-value { font-size:32px; font-weight:700; background:linear-gradient(135deg,#6366f1,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.day-navigator { display:flex; justify-content:center; align-items:center; gap:24px; background:rgba(25,29,56,0.65); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:20px 32px; margin-bottom:32px; }
+.nav-button { background:linear-gradient(135deg,#6366f1,#8b5cf6); border:none; color:white; padding:12px 24px; border-radius:10px; font-weight:600; cursor:pointer; }
+.nav-button:disabled { opacity:0.3; cursor:not-allowed; }
+.current-day { font-size:18px; font-weight:700; color:#6366f1; min-width:180px; text-align:center; letter-spacing:-0.3px; }
+.table-container { background:rgba(25,29,56,0.65); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); border-radius:16px; overflow:hidden; }
+table { width:100%; border-collapse:collapse; }
+thead { background:rgba(99,102,241,0.1); border-bottom:2px solid rgba(99,102,241,0.3); }
+th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-align:left; }
+.id-col { color:#6366f1; font-weight:700; font-size:13px; }
+.coord-col { font-family:'Monaco',monospace; color:#fbbf24; font-weight:500; }
+.alt-col { color:#10b981; font-weight:700; }
+.time-col { color:rgba(229,231,235,0.6); font-size:13px; font-family:'Monaco',monospace; }
+.loading, .no-data { text-align:center; padding:64px 32px; color:rgba(229,231,235,0.5); font-size:15px; }
+.download-button { background:linear-gradient(135deg,#10b981,#059669); border:none; color:white; padding:18px 36px; border-radius:12px; font-weight:700; cursor:pointer; font-size:16px; margin-top:32px; display:inline-flex; align-items:center; gap:12px; }
 
-body {
-  font-family: 'Inter', sans-serif;
-  background: #1a1a2e; /* slightly brighter than #0f0f23 */
-  color: #e5e7eb;
-  min-height: 100vh;
-  position: relative;
-  overflow-x: hidden;
-}
-
-/* Animated gradient background */
-body::before {
-  content: '';
-  position: fixed;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  z-index: -1;
-  background: 
-    radial-gradient(ellipse at 10% 20%, rgba(99, 102, 241, 0.2) 0%, transparent 40%),
-    radial-gradient(ellipse at 90% 70%, rgba(168, 85, 247, 0.18) 0%, transparent 40%),
-    radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.12) 0%, transparent 50%);
-}
-
-header {
-  background: rgba(25, 29, 56, 0.85);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 24px 48px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.logo-icon {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
-}
-
-.logo-text h1 {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.logo-text p {
-  font-size: 13px;
-  color: rgba(229, 231, 235, 0.6);
-  font-weight: 400;
-  margin-top: 2px;
-}
-
-.back-button {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  border: none;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
-}
-
-.back-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
-}
-
-.container {
-  max-width: 1400px;
-  margin: 48px auto;
-  padding: 0 48px;
-}
-
-/* Stats Cards */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-.stat-card {
-  background: rgba(25, 29, 56, 0.65);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 28px;
-  border-radius: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.stat-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.15);
-}
-
-.stat-label {
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: rgba(229, 231, 235, 0.6);
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 32px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Day Navigator */
-.day-navigator {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 24px;
-  background: rgba(25, 29, 56, 0.65);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 20px 32px;
-  margin-bottom: 32px;
-}
-
-.nav-button {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  border: none;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
-}
-
-.nav-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
-}
-
-.nav-button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.current-day {
-  font-size: 18px;
-  font-weight: 700;
-  color: #6366f1;
-  min-width: 180px;
-  text-align: center;
-  letter-spacing: -0.3px;
-}
-
-/* Table Container */
-.table-container {
-  background: rgba(25, 29, 56, 0.65);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-thead {
-  background: rgba(99, 102, 241, 0.1);
-  border-bottom: 2px solid rgba(99, 102, 241, 0.3);
-}
-
-th {
-  padding: 20px 24px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: rgba(229, 231, 235, 0.8);
-}
-
-tbody tr {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  transition: all 0.2s ease;
-}
-
-tbody tr:hover {
-  background: rgba(99, 102, 241, 0.08);
-}
-
-td {
-  padding: 18px 24px;
-  font-size: 14px;
-  color: rgba(229, 231, 235, 0.9);
-}
-
-.id-col { color: #6366f1; font-weight: 700; font-size: 13px; }
-.coord-col { font-family: 'Monaco', monospace; color: #fbbf24; font-weight: 500; }
-.alt-col { color: #10b981; font-weight: 700; }
-.time-col { color: rgba(229, 231, 235, 0.6); font-size: 13px; font-family: 'Monaco', monospace; }
-
-.loading, .no-data { text-align: center; padding: 64px 32px; color: rgba(229, 231, 235, 0.5); font-size: 15px; }
-
-/* Download Button */
-.download-button {
-  background: linear-gradient(135deg, #10b981, #059669);
-  border: none;
-  color: white;
-  padding: 18px 36px;
-  border-radius: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.3s;
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 32px;
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
-}
-
-.download-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
-}
 </style>
 </head>
 <body>
@@ -290,7 +55,6 @@ td {
 </header>
 
 <div class="container">
-  <!-- Stats Grid -->
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">Total Records</div>
@@ -302,14 +66,12 @@ td {
     </div>
   </div>
 
-  <!-- Day Navigator -->
   <div class="day-navigator">
     <button class="nav-button" id="prevDay" onclick="changeDay(-1)">← Previous</button>
     <div class="current-day" id="currentDay">Loading...</div>
     <button class="nav-button" id="nextDay" onclick="changeDay(1)">Next →</button>
   </div>
 
-  <!-- Data Table -->
   <div class="table-container">
     <table>
       <thead>
@@ -318,7 +80,7 @@ td {
           <th>Latitude (°)</th>
           <th>Longitude (°)</th>
           <th>Altitude (km)</th>
-          <th>Timestamp (UTC)</th>
+          <th>Timestamp (MYT)</th>
         </tr>
       </thead>
       <tbody id="tableBody">
@@ -334,6 +96,7 @@ td {
 let records = [];
 let currentDayIndex = 0;
 let days = [];
+let userManuallyChangedDay = false;
 
 async function fetchAllData() {
   try {
@@ -342,37 +105,36 @@ async function fetchAllData() {
     const newRecords = data.records || [];
 
     if(newRecords.length === 0){
+      records = []; days = [];
       document.getElementById('tableBody').innerHTML = '<tr><td colspan="5" class="no-data">No data available</td></tr>';
       document.getElementById('currentDay').innerText = '—';
       document.getElementById('totalRecords').innerText = '0';
       document.getElementById('totalDays').innerText = '0';
-      records = [];
-      days = [];
       return;
     }
 
-    // Check if new data added
-    const oldLatestDay = days[days.length-1];
+    const oldLatestDay = days.length > 0 ? days[days.length-1] : null;
 
     records = newRecords;
 
-    // Extract unique days
+    // extract unique days from ts_myt
     const daySet = new Set();
-    records.forEach(r => {
-    // Remove leading/trailing quotes, then get date
-    const day = r.ts_myt.replace(/^'+|'+$/g, '').split(' ')[0];
-    daySet.add(day);
-    r.day = day;
+    records.forEach(r=>{
+      const day = r.ts_myt.replace(/^'+|'+$/g,'').split(' ')[0];
+      daySet.add(day);
+      r.day = day;
     });
     days = Array.from(daySet).sort();
 
-    // Auto switch to latest day if new day is added
     const latestDay = days[days.length-1];
-    if(latestDay !== oldLatestDay) currentDayIndex = days.length - 1;
+    if(latestDay !== oldLatestDay && !userManuallyChangedDay){
+      currentDayIndex = days.length - 1;
+    }
+    if(currentDayIndex === days.length - 1) userManuallyChangedDay = false;
 
     updateSummary();
     renderTable();
-  } catch(err) {
+  } catch(err){
     console.error('Failed to fetch data:', err);
     document.getElementById('tableBody').innerHTML = '<tr><td colspan="5" class="no-data">Failed to load data</td></tr>';
   }
@@ -380,7 +142,7 @@ async function fetchAllData() {
 
 function updateSummary() {
   document.getElementById('totalRecords').innerText = records.length.toLocaleString();
-  const uniqueDays = [...new Set(records.map(r => r.ts_myt.split(' ')[0]))];
+  const uniqueDays = [...new Set(records.map(r=>r.ts_myt.replace(/^'+|'+$/g,'').split(' ')[0]))];
   document.getElementById('totalDays').innerText = uniqueDays.length;
 }
 
@@ -389,20 +151,19 @@ function renderTable() {
   const day = days[currentDayIndex];
   document.getElementById('currentDay').innerText = day;
   const dayRecords = records.filter(r => r.day === day);
-
   const tbody = document.getElementById('tableBody');
   if(dayRecords.length === 0){
     tbody.innerHTML = '<tr><td colspan="5" class="no-data">No records for this day</td></tr>';
     return;
   }
 
-  tbody.innerHTML = dayRecords.map((r, i) => `
+  tbody.innerHTML = dayRecords.map((r,i)=>`
     <tr>
       <td class="id-col">#${i+1}</td>
       <td class="coord-col">${r.latitude.toFixed(4)}</td>
       <td class="coord-col">${r.longitude.toFixed(4)}</td>
       <td class="alt-col">${r.altitude ? r.altitude.toFixed(2) : 'N/A'}</td>
-      <td class="time-col">${r.ts_myt}</td>
+      <td class="time-col">${r.ts_myt.replace(/^'+|'+$/g,'')}</td>
     </tr>
   `).join('');
 
@@ -411,6 +172,7 @@ function renderTable() {
 }
 
 function changeDay(direction){
+  userManuallyChangedDay = true;
   currentDayIndex += direction;
   if(currentDayIndex < 0) currentDayIndex = 0;
   if(currentDayIndex >= days.length) currentDayIndex = days.length - 1;
@@ -421,11 +183,8 @@ function downloadCSV(){
   window.location.href = '/api/download';
 }
 
-// Initial fetch
 fetchAllData();
-
-// Auto-refresh every 30 seconds
-setInterval(fetchAllData, 30000);
+setInterval(fetchAllData, 15000); // auto-refresh every 15 seconds
 </script>
 
 </body>
