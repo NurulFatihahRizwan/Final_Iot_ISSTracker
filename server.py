@@ -1,10 +1,10 @@
-# server.py — ISS collector with accurate UTC timestamps + preview + all-records
+# server.py — ISS collector with Malaysian time (UTC+8)
 from flask import Flask, jsonify, send_from_directory, request
 import requests
 import csv
 import os
 from threading import Thread, Event
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 
 app = Flask(__name__)
@@ -12,11 +12,13 @@ DATA_FILE = 'iss_data.csv'
 FETCH_INTERVAL = 60  # seconds
 stop_event = Event()
 
-# Ensure CSV file exists with header (timestamp = unix seconds + ts_utc string)
+MYT = timezone(timedelta(hours=8))  # Malaysia Time UTC+8
+
+# Ensure CSV file exists with header
 if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['timestamp','latitude','longitude','altitude','velocity','ts_utc'])
+        writer.writerow(['timestamp','latitude','longitude','altitude','velocity','ts_myt'])
 
 def safe_float(v):
     try:
@@ -36,23 +38,22 @@ def fetch_iss_data():
                 altitude = safe_float(d.get('altitude'))
                 velocity = safe_float(d.get('velocity'))
 
-                # Accurate UTC string
-                ts_utc = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+                # Malaysian time string
+                ts_myt = datetime.fromtimestamp(timestamp, tz=MYT).strftime('%Y-%m-%d %H:%M:%S')
 
                 with open(DATA_FILE, 'a', newline='') as f:
                     writer = csv.writer(f)
-                    writer.writerow([timestamp, latitude, longitude, altitude, velocity, ts_utc])
+                    writer.writerow([timestamp, latitude, longitude, altitude, velocity, ts_myt])
         except Exception as e:
             print("Error fetching ISS data:", e)
         stop_event.wait(FETCH_INTERVAL)
 
-# Start background fetching thread (daemon)
+# Start background fetching thread
 t = Thread(target=fetch_iss_data, daemon=True)
 t.start()
 
 @app.route('/api/preview')
 def api_preview():
-    # day_index semantics: 0 = first day found in CSV
     try:
         day_index = int(request.args.get('day_index', 0))
     except Exception:
@@ -73,7 +74,7 @@ def api_preview():
         except Exception:
             return jsonify({'records': []})
 
-        start_of_day = datetime.utcfromtimestamp(first_ts).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=day_index)
+        start_of_day = datetime.fromtimestamp(first_ts, tz=MYT).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=day_index)
         end_of_day = start_of_day + timedelta(days=1)
 
         for row in all_rows:
@@ -81,7 +82,7 @@ def api_preview():
                 ts = int(row['timestamp'])
             except Exception:
                 continue
-            dt = datetime.utcfromtimestamp(ts)
+            dt = datetime.fromtimestamp(ts, tz=MYT)
             if start_of_day <= dt < end_of_day:
                 lat = safe_float(row.get('latitude'))
                 lon = safe_float(row.get('longitude'))
@@ -89,7 +90,7 @@ def api_preview():
                 vel = safe_float(row.get('velocity'))
                 records.append({
                     'timestamp': ts,
-                    'ts_utc': row.get('ts_utc', dt.strftime('%Y-%m-%d %H:%M:%S')),
+                    'ts_myt': row.get('ts_myt', dt.strftime('%Y-%m-%d %H:%M:%S')),
                     'latitude': lat,
                     'longitude': lon,
                     'altitude': alt,
@@ -100,16 +101,6 @@ def api_preview():
 
 @app.route('/api/all-records')
 def api_all_records():
-    """
-    Returns:
-    {
-      records: [...],
-      total: n,
-      page, per_page, total_pages,
-      available_days: ['2025-11-10', ...]
-    }
-    Supports: page (1), per_page (1000), day (YYYY-MM-DD optional)
-    """
     if not os.path.exists(DATA_FILE):
         return jsonify({"records": [], "total": 0, "page":1, "per_page":1, "total_pages":1, "available_days": []})
 
@@ -131,12 +122,12 @@ def api_all_records():
                 ts = int(r.get('timestamp', 0))
             except Exception:
                 continue
-            dt = datetime.utcfromtimestamp(ts)
+            dt = datetime.fromtimestamp(ts, tz=MYT)
             day = dt.strftime('%Y-%m-%d')
             rows.append({
                 "id": i+1,
-                "timestamp": ts,
-                "ts_utc": r.get('ts_utc', dt.strftime('%Y-%m-%d %H:%M:%S')),
+                "timestamp_unix": ts,
+                "ts_myt": r.get('ts_myt', dt.strftime('%Y-%m-%d %H:%M:%S')),
                 "latitude": safe_float(r.get('latitude')),
                 "longitude": safe_float(r.get('longitude')),
                 "altitude": safe_float(r.get('altitude')),
@@ -144,7 +135,7 @@ def api_all_records():
                 "day": day
             })
 
-    rows_sorted = sorted(rows, key=lambda x: x['timestamp'], reverse=True)
+    rows_sorted = sorted(rows, key=lambda x: x['timestamp_unix'], reverse=True)
     days = sorted(list({r['day'] for r in rows}), reverse=True)
 
     filtered = [r for r in rows_sorted if (day_filter is None or r['day'] == day_filter)]
@@ -155,19 +146,8 @@ def api_all_records():
     end = start + per_page
     page_records = filtered[start:end]
 
-    out_records = [{
-        "id": r["id"],
-        "timestamp_unix": r["timestamp"],
-        "ts_utc": r["ts_utc"],
-        "latitude": r["latitude"],
-        "longitude": r["longitude"],
-        "altitude": r["altitude"],
-        "velocity": r["velocity"],
-        "day": r["day"]
-    } for r in page_records]
-
     return jsonify({
-        "records": out_records,
+        "records": page_records,
         "total": total,
         "page": page,
         "per_page": per_page,
