@@ -39,7 +39,7 @@ def fetch_and_save_iss_data():
             velocity = safe_float(d.get('velocity'))
 
             ts_myt = datetime.fromtimestamp(timestamp, tz=MYT).strftime('%Y-%m-%d %H:%M:%S')
-            ts_myt_excel = "'" + ts_myt
+            ts_myt_excel = "'" + ts_myt  # Excel-friendly
 
             with open(DATA_FILE, 'a', newline='') as f:
                 writer = csv.writer(f)
@@ -60,7 +60,7 @@ if os.environ.get("RENDER") is None:  # Avoid infinite loop on Render
     t = Thread(target=fetch_iss_data, daemon=True)
     t.start()
 
-# --- NEW: Manual fetch route for Render ---
+# --- Manual fetch route for Render ---
 @app.route('/api/fetch-now')
 def api_fetch_now():
     success = fetch_and_save_iss_data()
@@ -118,14 +118,6 @@ def api_all_records():
     if not os.path.exists(DATA_FILE):
         return jsonify({"records": [], "total": 0, "page":1, "per_page":1, "total_pages":1, "available_days": []})
 
-    try:
-        page = max(1, int(request.args.get('page', 1)))
-    except Exception:
-        page = 1
-    try:
-        per_page = min(5000, max(1, int(request.args.get('per_page', 1000))))
-    except Exception:
-        per_page = 1000
     day_filter = request.args.get('day', None)
 
     rows = []
@@ -155,17 +147,16 @@ def api_all_records():
     filtered = [r for r in rows_sorted if (day_filter is None or r['day'] == day_filter)]
 
     total = len(filtered)
-    total_pages = (total + per_page - 1) // per_page if total else 1
-    start = (page - 1) * per_page
-    end = start + per_page
-    page_records = filtered[start:end]
+
+    # --- FIXED: Remove pagination slicing ---
+    page_records = filtered  # return all rows
 
     return jsonify({
         "records": page_records,
         "total": total,
-        "page": page,
-        "per_page": per_page,
-        "total_pages": total_pages,
+        "page": 1,
+        "per_page": total,
+        "total_pages": 1,
         "available_days": days
     })
 
