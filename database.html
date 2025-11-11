@@ -38,7 +38,6 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
 .time-col { color:rgba(229,231,235,0.6); font-size:13px; font-family:'Monaco',monospace; }
 .loading, .no-data { text-align:center; padding:64px 32px; color:rgba(229,231,235,0.5); font-size:15px; }
 .download-button { background:linear-gradient(135deg,#10b981,#059669); border:none; color:white; padding:18px 36px; border-radius:12px; font-weight:700; cursor:pointer; font-size:16px; margin-top:32px; display:inline-flex; align-items:center; gap:12px; }
-
 </style>
 </head>
 <body>
@@ -80,11 +79,12 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
           <th>Latitude (°)</th>
           <th>Longitude (°)</th>
           <th>Altitude (km)</th>
+          <th>Velocity (km/h)</th>
           <th>Timestamp (MYT)</th>
         </tr>
       </thead>
       <tbody id="tableBody">
-        <tr><td colspan="5" class="loading">Loading data...</td></tr>
+        <tr><td colspan="6" class="loading">Loading data...</td></tr>
       </tbody>
     </table>
   </div>
@@ -94,97 +94,97 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
 
 <script>
 let records = [];
-let currentDayIndex = 0;
 let days = [];
+let currentDayIndex = 0;
 let userManuallyChangedDay = false;
 
+// --- Fetch new ISS data every 60s (for Render) ---
+async function fetchNow() {
+  try {
+    const res = await fetch('/api/fetch-now');
+    const data = await res.json();
+    if (data.success) console.log('✅ New ISS data fetched.');
+  } catch (err) {
+    console.error('⚠️ Fetch-now failed:', err);
+  }
+}
+
+// --- Fetch all data from backend ---
 async function fetchAllData() {
   try {
-    const res = await fetch('/api/preview');
+    const res = await fetch('/api/all-records');
     const data = await res.json();
-    const newRecords = data.records || [];
-
-    if(newRecords.length === 0){
-      records = []; days = [];
-      document.getElementById('tableBody').innerHTML = '<tr><td colspan="5" class="no-data">No data available</td></tr>';
+    records = data.records || [];
+    days = data.available_days || [];
+    if (days.length === 0) {
+      document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="no-data">No data available</td></tr>';
       document.getElementById('currentDay').innerText = '—';
       document.getElementById('totalRecords').innerText = '0';
       document.getElementById('totalDays').innerText = '0';
       return;
     }
 
-    const oldLatestDay = days.length > 0 ? days[days.length-1] : null;
+    // Sort days newest to oldest
+    days.sort((a,b)=>new Date(b)-new Date(a));
+    if (!userManuallyChangedDay) currentDayIndex = 0;
 
-    records = newRecords;
-
-    // extract unique days from ts_myt
-    const daySet = new Set();
-    records.forEach(r=>{
-      const day = r.ts_myt.replace(/^'+|'+$/g,'').split(' ')[0];
-      daySet.add(day);
-      r.day = day;
-    });
-    days = Array.from(daySet).sort();
-
-    const latestDay = days[days.length-1];
-    if(latestDay !== oldLatestDay && !userManuallyChangedDay){
-      currentDayIndex = days.length - 1;
-    }
-    if(currentDayIndex === days.length - 1) userManuallyChangedDay = false;
-
-    updateSummary();
+    updateSummary(data);
     renderTable();
-  } catch(err){
-    console.error('Failed to fetch data:', err);
-    document.getElementById('tableBody').innerHTML = '<tr><td colspan="5" class="no-data">Failed to load data</td></tr>';
+  } catch (err) {
+    console.error('Failed to load data:', err);
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="no-data">Failed to load data</td></tr>';
   }
 }
 
-function updateSummary() {
-  document.getElementById('totalRecords').innerText = records.length.toLocaleString();
-  const uniqueDays = [...new Set(records.map(r=>r.ts_myt.replace(/^'+|'+$/g,'').split(' ')[0]))];
-  document.getElementById('totalDays').innerText = uniqueDays.length;
+function updateSummary(data) {
+  document.getElementById('totalRecords').innerText = (data.total || records.length).toLocaleString();
+  document.getElementById('totalDays').innerText = days.length;
 }
 
 function renderTable() {
-  if(days.length === 0) return;
+  if (days.length === 0) return;
   const day = days[currentDayIndex];
   document.getElementById('currentDay').innerText = day;
+
   const dayRecords = records.filter(r => r.day === day);
   const tbody = document.getElementById('tableBody');
-  if(dayRecords.length === 0){
-    tbody.innerHTML = '<tr><td colspan="5" class="no-data">No records for this day</td></tr>';
+
+  if (dayRecords.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="no-data">No records for this day</td></tr>';
     return;
   }
 
-  tbody.innerHTML = dayRecords.map((r,i)=>`
+  tbody.innerHTML = dayRecords.map((r, i) => `
     <tr>
-      <td class="id-col">#${i+1}</td>
-      <td class="coord-col">${r.latitude.toFixed(4)}</td>
-      <td class="coord-col">${r.longitude.toFixed(4)}</td>
+      <td class="id-col">#${r.id || i+1}</td>
+      <td class="coord-col">${(r.latitude ?? 0).toFixed(4)}</td>
+      <td class="coord-col">${(r.longitude ?? 0).toFixed(4)}</td>
       <td class="alt-col">${r.altitude ? r.altitude.toFixed(2) : 'N/A'}</td>
+      <td>${r.velocity ? r.velocity.toFixed(2) : 'N/A'}</td>
       <td class="time-col">${r.ts_myt.replace(/^'+|'+$/g,'')}</td>
     </tr>
   `).join('');
 
-  document.getElementById('prevDay').disabled = currentDayIndex === 0;
-  document.getElementById('nextDay').disabled = currentDayIndex === days.length - 1;
+  document.getElementById('prevDay').disabled = currentDayIndex === days.length - 1;
+  document.getElementById('nextDay').disabled = currentDayIndex === 0;
 }
 
-function changeDay(direction){
+function changeDay(direction) {
   userManuallyChangedDay = true;
-  currentDayIndex += direction;
-  if(currentDayIndex < 0) currentDayIndex = 0;
-  if(currentDayIndex >= days.length) currentDayIndex = days.length - 1;
+  currentDayIndex -= direction; // reversed because newest day is index 0
+  if (currentDayIndex < 0) currentDayIndex = 0;
+  if (currentDayIndex >= days.length) currentDayIndex = days.length - 1;
   renderTable();
 }
 
-function downloadCSV(){
+function downloadCSV() {
   window.location.href = '/api/download';
 }
 
+// --- Start loops ---
 fetchAllData();
-setInterval(fetchAllData, 15000); // auto-refresh every 15 seconds
+setInterval(fetchAllData, 15000); // refresh table every 15s
+setInterval(fetchNow, 60000);     // fetch new ISS data every 60s
 </script>
 
 </body>
