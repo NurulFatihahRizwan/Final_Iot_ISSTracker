@@ -26,33 +26,45 @@ def safe_float(v):
     except Exception:
         return None
 
+def fetch_and_save_iss_data():
+    """Fetch ISS data once and save to CSV."""
+    try:
+        res = requests.get('https://api.wheretheiss.at/v1/satellites/25544', timeout=8)
+        if res.status_code == 200:
+            d = res.json()
+            timestamp = int(d.get('timestamp', time.time()))
+            latitude = safe_float(d.get('latitude'))
+            longitude = safe_float(d.get('longitude'))
+            altitude = safe_float(d.get('altitude'))
+            velocity = safe_float(d.get('velocity'))
+
+            ts_myt = datetime.fromtimestamp(timestamp, tz=MYT).strftime('%Y-%m-%d %H:%M:%S')
+            ts_myt_excel = "'" + ts_myt
+
+            with open(DATA_FILE, 'a', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([timestamp, latitude, longitude, altitude, velocity, ts_myt_excel])
+            return True
+    except Exception as e:
+        print("Error fetching ISS data:", e)
+    return False
+
 def fetch_iss_data():
+    """Background thread fetch loop (may not run in Render)."""
     while not stop_event.is_set():
-        try:
-            res = requests.get('https://api.wheretheiss.at/v1/satellites/25544', timeout=8)
-            if res.status_code == 200:
-                d = res.json()
-                timestamp = int(d.get('timestamp', time.time()))
-                latitude = safe_float(d.get('latitude'))
-                longitude = safe_float(d.get('longitude'))
-                altitude = safe_float(d.get('altitude'))
-                velocity = safe_float(d.get('velocity'))
-
-                # --- UPDATED: Malaysian time in ISO format for CSV ---
-                ts_myt = datetime.fromtimestamp(timestamp, tz=MYT).strftime('%Y-%m-%d %H:%M:%S')
-                # Optional: prepend single quote for Excel-safe text
-                ts_myt_excel = "'" + ts_myt
-
-                with open(DATA_FILE, 'a', newline='') as f:
-                    writer = csv.writer(f)
-                    writer.writerow([timestamp, latitude, longitude, altitude, velocity, ts_myt_excel])
-        except Exception as e:
-            print("Error fetching ISS data:", e)
+        fetch_and_save_iss_data()
         stop_event.wait(FETCH_INTERVAL)
 
-# Start background fetching thread
-t = Thread(target=fetch_iss_data, daemon=True)
-t.start()
+# Start background fetching thread (safe locally)
+if os.environ.get("RENDER") is None:  # Avoid infinite loop on Render
+    t = Thread(target=fetch_iss_data, daemon=True)
+    t.start()
+
+# --- NEW: Manual fetch route for Render ---
+@app.route('/api/fetch-now')
+def api_fetch_now():
+    success = fetch_and_save_iss_data()
+    return jsonify({'success': success})
 
 @app.route('/api/preview')
 def api_preview():
@@ -157,7 +169,6 @@ def api_all_records():
         "available_days": days
     })
 
-# Serve frontend files
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
