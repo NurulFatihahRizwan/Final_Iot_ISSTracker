@@ -45,16 +45,16 @@ def fetch_and_save_iss_data():
     return False
 
 def background_fetch():
+    """Run fetch in a loop every FETCH_INTERVAL seconds."""
     while not stop_event.is_set():
         fetch_and_save_iss_data()
         stop_event.wait(FETCH_INTERVAL)
 
-# Start background thread only locally
-if os.environ.get("RENDER") is None:
-    t = Thread(target=background_fetch, daemon=True)
-    t.start()
+# Always start background thread
+t = Thread(target=background_fetch, daemon=True)
+t.start()
 
-# --- API: Manual fetch ---
+# --- API: Manual fetch (cron-friendly) ---
 @app.route('/api/fetch-now')
 def api_fetch_now():
     success = fetch_and_save_iss_data()
@@ -129,14 +129,13 @@ def api_all_records():
     filtered = [r for r in rows_sorted if day_filter is None or r['day']==day_filter]
     return jsonify({"records": filtered, "total": len(filtered), "available_days": days})
 
-# --- CSV download: all data ---
+# --- CSV download ---
 @app.route('/api/download')
 def download_all_csv():
     if os.path.exists(DATA_FILE):
         return send_from_directory('.', DATA_FILE, as_attachment=True)
     return "CSV not found", 404
 
-# --- CSV download: per day ---
 @app.route('/api/download/<day>')
 def download_csv_by_day(day):
     if not os.path.exists(DATA_FILE):
@@ -161,20 +160,14 @@ def download_csv_by_day(day):
     resp.headers["Content-type"] = "text/csv"
     return resp
 
-# --- Serve HTML pages ---
+# --- Serve HTML ---
 @app.route('/')
-def serve_index():
-    return send_from_directory('.', 'index.html')
-
+def serve_index(): return send_from_directory('.', 'index.html')
 @app.route('/database')
-def serve_database():
-    return send_from_directory('.', 'database.html')
-
+def serve_database(): return send_from_directory('.', 'database.html')
 @app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory('.', path)
+def serve_static(path): return send_from_directory('.', path)
 
-# --- Run ---
 if __name__ == '__main__':
     try:
         app.run(debug=True, host='0.0.0.0', port=5000)
