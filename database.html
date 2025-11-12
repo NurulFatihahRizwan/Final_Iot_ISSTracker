@@ -12,23 +12,85 @@ body::before { content:''; position:fixed; width:100%; height:100%; top:0; left:
              radial-gradient(ellipse at 90% 70%, rgba(168, 85, 247, 0.18) 0%, transparent 40%),
              radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.12) 0%, transparent 50%);
 }
-header { background: rgba(25,29,56,0.85); backdrop-filter: blur(20px); border-bottom:1px solid rgba(255,255,255,0.06);
-  padding:24px 48px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:1000; }
+header {
+  background: rgba(25,29,56,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 20px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
 .logo { display:flex; align-items:center; gap:16px; }
-.logo-icon { width:48px; height:48px; background:linear-gradient(135deg,#6366f1,#a855f7); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 8px 32px rgba(99,102,241,0.3); }
-.logo-text h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; background:linear-gradient(135deg,#6366f1,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.logo-text p { font-size:13px; color:rgba(229,231,235,0.6); font-weight:400; margin-top:2px; }
-.back-button { background:linear-gradient(135deg,#6366f1,#8b5cf6); border:none; color:white; padding:12px 24px; border-radius:12px; font-weight:600; cursor:pointer; font-size:14px; display:flex; align-items:center; gap:8px; text-decoration:none; }
+.logo-icon {
+  width:48px; height:48px;
+  background:linear-gradient(135deg,#6366f1,#a855f7);
+  border-radius:12px; display:flex; align-items:center; justify-content:center;
+  font-size:24px; box-shadow:0 8px 32px rgba(99,102,241,0.3);
+}
+.logo-text h1 {
+  font-size:24px; font-weight:700; letter-spacing:-0.5px;
+  background:linear-gradient(135deg,#6366f1,#a855f7);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.logo-text p { font-size:13px; color:rgba(229,231,235,0.6); margin-top:2px; }
+
+.download-button {
+  background:linear-gradient(135deg,#10b981,#059669);
+  border:none; color:white;
+  padding:14px 24px;
+  border-radius:12px;
+  font-weight:600;
+  cursor:pointer;
+  font-size:14px;
+  display:flex; align-items:center; gap:8px;
+}
+
 .container { max-width:1400px; margin:48px auto; padding:0 48px; }
 .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:24px; margin-bottom:32px; }
-.stat-card { background:rgba(25,29,56,0.65); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); padding:28px; border-radius:16px; }
+.stat-card {
+  background:rgba(25,29,56,0.65); backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.08); padding:28px; border-radius:16px;
+}
 .stat-label { font-size:13px; font-weight:600; text-transform:uppercase; color:rgba(229,231,235,0.6); margin-bottom:8px; }
-.stat-value { font-size:32px; font-weight:700; background:linear-gradient(135deg,#6366f1,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.day-navigator { display:flex; justify-content:center; align-items:center; gap:24px; background:rgba(25,29,56,0.65); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:20px 32px; margin-bottom:32px; }
-.nav-button { background:linear-gradient(135deg,#6366f1,#8b5cf6); border:none; color:white; padding:12px 24px; border-radius:10px; font-weight:600; cursor:pointer; }
-.nav-button:disabled { opacity:0.3; cursor:not-allowed; }
-.current-day { font-size:18px; font-weight:700; color:#6366f1; min-width:180px; text-align:center; letter-spacing:-0.3px; }
-.table-container { background:rgba(25,29,56,0.65); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); border-radius:16px; overflow:hidden; }
+.stat-value { font-size:28px; font-weight:700; background:linear-gradient(135deg,#6366f1,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+.captured-dates {
+  background:rgba(25,29,56,0.65);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;
+  padding:20px 28px;
+  margin-bottom:32px;
+}
+.captured-dates h3 { font-size:16px; font-weight:600; color:#a855f7; margin-bottom:12px; }
+.captured-dates ul { list-style:none; }
+.captured-dates li {
+  font-size:14px; color:rgba(229,231,235,0.85);
+  margin-bottom:4px;
+}
+
+.table-controls {
+  display:flex; justify-content:space-between; align-items:center;
+  background:rgba(25,29,56,0.65);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px; padding:16px 24px; margin-bottom:16px;
+}
+.table-controls select {
+  background:rgba(255,255,255,0.1);
+  color:white; border:none; padding:8px 12px;
+  border-radius:8px; font-size:14px;
+}
+
+.table-container {
+  background:rgba(25,29,56,0.65);
+  backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;
+  overflow:hidden;
+}
 table { width:100%; border-collapse:collapse; }
 thead { background:rgba(99,102,241,0.1); border-bottom:2px solid rgba(99,102,241,0.3); }
 th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-align:left; }
@@ -37,7 +99,6 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
 .alt-col { color:#10b981; font-weight:700; }
 .time-col { color:rgba(229,231,235,0.6); font-size:13px; font-family:'Monaco',monospace; }
 .loading, .no-data { text-align:center; padding:64px 32px; color:rgba(229,231,235,0.5); font-size:15px; }
-.download-button { background:linear-gradient(135deg,#10b981,#059669); border:none; color:white; padding:18px 36px; border-radius:12px; font-weight:700; cursor:pointer; font-size:16px; margin-top:32px; display:inline-flex; align-items:center; gap:12px; }
 </style>
 </head>
 <body>
@@ -50,11 +111,11 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
       <p>ISS Position Records Archive</p>
     </div>
   </div>
-   <button class="download-button" onclick="downloadCSV()">💾 Download All Data (CSV)</button>
-  <a href="/" class="back-button">← Back to Dashboard</a>
+  <button class="download-button" onclick="downloadCSV()">💾 Download All Data (CSV)</button>
 </header>
 
 <div class="container">
+
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">Total Records</div>
@@ -64,12 +125,27 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
       <div class="stat-label">Total Days</div>
       <div class="stat-value" id="totalDays">0</div>
     </div>
+    <div class="stat-card">
+      <div class="stat-label">Today's Date</div>
+      <div class="stat-value" id="todayDate">--</div>
+    </div>
   </div>
 
-  <div class="day-navigator">
-    <button class="nav-button" id="prevDay" onclick="changeDay(-1)">← Previous</button>
-    <div class="current-day" id="currentDay">Loading...</div>
-    <button class="nav-button" id="nextDay" onclick="changeDay(1)">Next →</button>
+  <div class="captured-dates">
+    <h3>📅 Dates Data Have Been Captured:</h3>
+    <ul id="dateList">
+      <li>Loading...</li>
+    </ul>
+  </div>
+
+  <div class="table-controls">
+    <div>
+      <label for="daySelect">Filter by Date: </label>
+      <select id="daySelect" onchange="selectDay()">
+        <option>Loading...</option>
+      </select>
+    </div>
+    <span style="color:#9ca3af;font-size:13px;">Showing latest 15 records</span>
   </div>
 
   <div class="table-container">
@@ -94,21 +170,9 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
 <script>
 let records = [];
 let days = [];
-let currentDayIndex = 0;
-let userManuallyChangedDay = false;
+let currentDay = null;
 
-// --- Fetch new ISS data every 60s (for Render) ---
-async function fetchNow() {
-  try {
-    const res = await fetch('/api/fetch-now');
-    const data = await res.json();
-    if (data.success) console.log('✅ New ISS data fetched.');
-  } catch (err) {
-    console.error('⚠️ Fetch-now failed:', err);
-  }
-}
-
-// --- Fetch all data from backend ---
+// Fetch all data from backend
 async function fetchAllData() {
   try {
     const res = await fetch('/api/all-records');
@@ -116,77 +180,80 @@ async function fetchAllData() {
     records = data.records || [];
     days = data.available_days || [];
 
-    if (days.length === 0) {
-      document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="no-data">No data available</td></tr>';
-      document.getElementById('currentDay').innerText = '—';
-      document.getElementById('totalRecords').innerText = '0';
-      document.getElementById('totalDays').innerText = '0';
-      return;
-    }
-
-    // Sort days newest to oldest
-    days.sort((a,b)=>new Date(b)-new Date(a));
-    if (!userManuallyChangedDay) currentDayIndex = 0;
-
     updateSummary(data);
+    updateDateList();
+    updateDaySelect();
+    if (!currentDay && days.length > 0) currentDay = days[0];
     renderTable();
   } catch (err) {
     console.error('Failed to load data:', err);
-    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="no-data">Failed to load data</td></tr>';
   }
 }
 
 function updateSummary(data) {
   document.getElementById('totalRecords').innerText = (data.total || records.length).toLocaleString();
   document.getElementById('totalDays').innerText = days.length;
+  document.getElementById('todayDate').innerText = new Date().toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function updateDateList() {
+  const list = document.getElementById('dateList');
+  if (days.length === 0) {
+    list.innerHTML = '<li>No data captured yet</li>';
+    return;
+  }
+  list.innerHTML = days.map(d => `<li>${d}</li>`).join('');
+}
+
+function updateDaySelect() {
+  const sel = document.getElementById('daySelect');
+  if (days.length === 0) {
+    sel.innerHTML = '<option>No Data</option>';
+    return;
+  }
+  sel.innerHTML = days.map(d => `<option value="${d}" ${d===currentDay?'selected':''}>${d}</option>`).join('');
+}
+
+function selectDay() {
+  currentDay = document.getElementById('daySelect').value;
+  renderTable();
 }
 
 function renderTable() {
-  if (days.length === 0) return;
-  // Clamp currentDayIndex to valid range
-  if (currentDayIndex < 0) currentDayIndex = 0;
-  if (currentDayIndex >= days.length) currentDayIndex = days.length - 1;
-
-  const day = days[currentDayIndex];
-  document.getElementById('currentDay').innerText = day;
-
-  const dayRecords = records.filter(r => r.day === day);
   const tbody = document.getElementById('tableBody');
+  if (!currentDay) {
+    tbody.innerHTML = '<tr><td colspan="6" class="no-data">No date selected</td></tr>';
+    return;
+  }
 
-  if (!dayRecords.length) {
+  const dayRecords = records.filter(r => r.day === currentDay)
+                            .sort((a, b) => new Date(b.ts_myt) - new Date(a.ts_myt))
+                            .slice(0, 15);
+
+  if (dayRecords.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="no-data">No records for this day</td></tr>';
     return;
   }
 
   tbody.innerHTML = dayRecords.map((r, i) => `
     <tr>
-      <td class="id-col">#${r.id || i+1}</td>
+      <td class="id-col">#${r.id || i + 1}</td>
       <td class="coord-col">${(r.latitude ?? 0).toFixed(4)}</td>
       <td class="coord-col">${(r.longitude ?? 0).toFixed(4)}</td>
       <td class="alt-col">${r.altitude ? r.altitude.toFixed(2) : 'N/A'}</td>
       <td>${r.velocity ? r.velocity.toFixed(2) : 'N/A'}</td>
-      <td class="time-col">${r.ts_myt.replace(/^'+|'+$/g,'')}</td>
+      <td class="time-col">${r.ts_myt.replace(/^'+|'+$/g, '')}</td>
     </tr>
   `).join('');
-
-  document.getElementById('prevDay').disabled = currentDayIndex >= days.length - 1;
-  document.getElementById('nextDay').disabled = currentDayIndex <= 0;
-}
-
-function changeDay(direction) {
-  userManuallyChangedDay = true;
-  currentDayIndex -= direction; // newest day is index 0
-  renderTable();
 }
 
 function downloadCSV() {
   window.location.href = '/api/download';
 }
 
-// --- Start loops ---
+// Refresh every 30 seconds
 fetchAllData();
-setInterval(fetchAllData, 15000); // refresh table every 15s
-setInterval(fetchNow, 60000);     // fetch new ISS data every 60s
+setInterval(fetchAllData, 30000);
 </script>
 
 </body>
