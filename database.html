@@ -41,7 +41,7 @@ header {
 .download-button {
   background:linear-gradient(135deg,#10b981,#059669);
   border:none; color:white;
-  padding:14px 24px;
+  padding:12px 20px;
   border-radius:12px;
   font-weight:600;
   cursor:pointer;
@@ -72,13 +72,16 @@ header {
   margin-bottom:4px;
 }
 
-.table-controls {
-  display:flex; justify-content:space-between; align-items:center;
+.table-controls{
+  display:flex; align-items:center; justify-content:flex-start;
   background:rgba(25,29,56,0.65);
   border:1px solid rgba(255,255,255,0.08);
-  border-radius:16px; padding:16px 24px; margin-bottom:16px;
+  border-radius:16px;
+  padding:16px 24px;
+  margin-bottom:16px;
+  gap:16px;
 }
-.table-controls select {
+.table-controls select{
   background:rgba(255,255,255,0.1);
   color:white; border:none; padding:8px 12px;
   border-radius:8px; font-size:14px;
@@ -111,41 +114,28 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
       <p>ISS Position Records Archive</p>
     </div>
   </div>
-  <button class="download-button" onclick="downloadCSV()">💾 Download All Data (CSV)</button>
+  <button class="download-button" onclick="downloadAll()">💾 Download All Days</button>
 </header>
 
 <div class="container">
 
   <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-label">Total Records</div>
-      <div class="stat-value" id="totalRecords">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Total Days</div>
-      <div class="stat-value" id="totalDays">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Today's Date</div>
-      <div class="stat-value" id="todayDate">--</div>
-    </div>
+    <div class="stat-card"><div class="stat-label">Total Records</div><div class="stat-value" id="totalRecords">0</div></div>
+    <div class="stat-card"><div class="stat-label">Total Days</div><div class="stat-value" id="totalDays">0</div></div>
+    <div class="stat-card"><div class="stat-label">Today's Date</div><div class="stat-value" id="todayDate">--</div></div>
   </div>
 
   <div class="captured-dates">
     <h3>📅 Dates Data Have Been Captured:</h3>
-    <ul id="dateList">
-      <li>Loading...</li>
-    </ul>
+    <ul id="dateList"><li>Loading...</li></ul>
   </div>
 
   <div class="table-controls">
-    <div>
-      <label for="daySelect">Filter by Date: </label>
-      <select id="daySelect" onchange="selectDay()">
-        <option>Loading...</option>
-      </select>
-    </div>
-    <span style="color:#9ca3af;font-size:13px;">Showing latest 15 records</span>
+    <label for="daySelect">Filter by Date:</label>
+    <select id="daySelect" onchange="selectDay()">
+      <option>Loading...</option>
+    </select>
+    <button class="download-button" style="margin-left:auto;" onclick="downloadDay()">💾 Download Day CSV</button>
   </div>
 
   <div class="table-container">
@@ -172,7 +162,6 @@ let records = [];
 let days = [];
 let currentDay = null;
 
-// Fetch all data from backend
 async function fetchAllData() {
   try {
     const res = await fetch('/api/all-records');
@@ -183,77 +172,59 @@ async function fetchAllData() {
     updateSummary(data);
     updateDateList();
     updateDaySelect();
-    if (!currentDay && days.length > 0) currentDay = days[0];
+    if (!currentDay && days.length>0) currentDay=days[0];
     renderTable();
-  } catch (err) {
+  } catch(err) {
     console.error('Failed to load data:', err);
   }
 }
 
-function updateSummary(data) {
-  document.getElementById('totalRecords').innerText = (data.total || records.length).toLocaleString();
-  document.getElementById('totalDays').innerText = days.length;
-  document.getElementById('todayDate').innerText = new Date().toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' });
+function updateSummary(data){
+  document.getElementById('totalRecords').innerText=(data.total||records.length).toLocaleString();
+  document.getElementById('totalDays').innerText=days.length;
+  document.getElementById('todayDate').innerText=new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
 }
 
-function updateDateList() {
-  const list = document.getElementById('dateList');
-  if (days.length === 0) {
-    list.innerHTML = '<li>No data captured yet</li>';
-    return;
-  }
-  list.innerHTML = days.map(d => `<li>${d}</li>`).join('');
+function updateDateList(){
+  const list=document.getElementById('dateList');
+  if(days.length===0){ list.innerHTML='<li>No data captured yet</li>'; return; }
+  list.innerHTML=days.map(d=>`<li>${d}</li>`).join('');
 }
 
-function updateDaySelect() {
-  const sel = document.getElementById('daySelect');
-  if (days.length === 0) {
-    sel.innerHTML = '<option>No Data</option>';
-    return;
-  }
-  sel.innerHTML = days.map(d => `<option value="${d}" ${d===currentDay?'selected':''}>${d}</option>`).join('');
+function updateDaySelect(){
+  const sel=document.getElementById('daySelect');
+  if(days.length===0){ sel.innerHTML='<option>No Data</option>'; return; }
+  sel.innerHTML=days.map(d=>`<option value="${d}" ${d===currentDay?'selected':''}>${d}</option>`).join('');
 }
 
-function selectDay() {
-  currentDay = document.getElementById('daySelect').value;
-  renderTable();
-}
+function selectDay(){ currentDay=document.getElementById('daySelect').value; renderTable(); }
 
-function renderTable() {
-  const tbody = document.getElementById('tableBody');
-  if (!currentDay) {
-    tbody.innerHTML = '<tr><td colspan="6" class="no-data">No date selected</td></tr>';
-    return;
-  }
-
-  const dayRecords = records.filter(r => r.day === currentDay)
-                            .sort((a, b) => new Date(b.ts_myt) - new Date(a.ts_myt))
-                            .slice(0, 15);
-
-  if (dayRecords.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="no-data">No records for this day</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = dayRecords.map((r, i) => `
+function renderTable(){
+  const tbody=document.getElementById('tableBody');
+  if(!currentDay){ tbody.innerHTML='<tr><td colspan="6" class="no-data">No date selected</td></tr>'; return; }
+  const dayRecords=records.filter(r=>r.day===currentDay)
+                          .sort((a,b)=>new Date(b.ts_myt)-new Date(a.ts_myt))
+                          .slice(0,15);
+  if(dayRecords.length===0){ tbody.innerHTML='<tr><td colspan="6" class="no-data">No records for this day</td></tr>'; return; }
+  tbody.innerHTML=dayRecords.map((r,i)=>`
     <tr>
-      <td class="id-col">#${r.id || i + 1}</td>
-      <td class="coord-col">${(r.latitude ?? 0).toFixed(4)}</td>
-      <td class="coord-col">${(r.longitude ?? 0).toFixed(4)}</td>
-      <td class="alt-col">${r.altitude ? r.altitude.toFixed(2) : 'N/A'}</td>
-      <td>${r.velocity ? r.velocity.toFixed(2) : 'N/A'}</td>
-      <td class="time-col">${r.ts_myt.replace(/^'+|'+$/g, '')}</td>
+      <td class="id-col">#${r.id||i+1}</td>
+      <td class="coord-col">${(r.latitude??0).toFixed(4)}</td>
+      <td class="coord-col">${(r.longitude??0).toFixed(4)}</td>
+      <td class="alt-col">${r.altitude? r.altitude.toFixed(2) : 'N/A'}</td>
+      <td>${r.velocity? r.velocity.toFixed(2) : 'N/A'}</td>
+      <td class="time-col">${r.ts_myt.replace(/^'+|'+$/g,'')}</td>
     </tr>
   `).join('');
 }
 
-function downloadCSV() {
-  window.location.href = '/api/download';
-}
+// Download functions
+function downloadAll(){ window.location.href='/api/download'; }
+function downloadDay(){ if(currentDay) window.location.href=`/api/download/${currentDay}`; }
 
-// Refresh every 30 seconds
+// Refresh every 30s
 fetchAllData();
-setInterval(fetchAllData, 30000);
+setInterval(fetchAllData,30000);
 </script>
 
 </body>
