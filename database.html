@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>ISS Database Viewer</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Inter', sans-serif; background:#1a1a2e; color:#e5e7eb; min-height:100vh; position:relative; overflow-x:hidden; }
+body { font-family:'Inter',sans-serif; background:#1a1a2e; color:#e5e7eb; min-height:100vh; position:relative; overflow-x:hidden; }
 body::before { content:''; position:fixed; width:100%; height:100%; top:0; left:0; z-index:-1;
-  background: radial-gradient(ellipse at 10% 20%, rgba(99, 102, 241, 0.2) 0%, transparent 40%),
-             radial-gradient(ellipse at 90% 70%, rgba(168, 85, 247, 0.18) 0%, transparent 40%),
-             radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.12) 0%, transparent 50%);
+  background: radial-gradient(ellipse at 10% 20%, rgba(99,102,241,0.2) 0%, transparent 40%),
+             radial-gradient(ellipse at 90% 70%, rgba(168,85,247,0.18) 0%, transparent 40%),
+             radial-gradient(ellipse at 50% 50%, rgba(59,130,246,0.12) 0%, transparent 50%);
 }
 header {
   background: rgba(25,29,56,0.85);
@@ -38,7 +38,7 @@ header {
 }
 .logo-text p { font-size:13px; color:rgba(229,231,235,0.6); margin-top:2px; }
 
-.download-button {
+.download-button, .back-dashboard {
   background:linear-gradient(135deg,#10b981,#059669);
   border:none; color:white;
   padding:12px 20px;
@@ -48,8 +48,10 @@ header {
   font-size:14px;
   display:flex; align-items:center; gap:8px;
 }
+.download-button:hover, .back-dashboard:hover { opacity:0.9; }
 
 .container { max-width:1400px; margin:48px auto; padding:0 48px; }
+
 .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:24px; margin-bottom:32px; }
 .stat-card {
   background:rgba(25,29,56,0.65); backdrop-filter:blur(20px);
@@ -102,6 +104,8 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
 .alt-col { color:#10b981; font-weight:700; }
 .time-col { color:rgba(229,231,235,0.6); font-size:13px; font-family:'Monaco',monospace; }
 .loading, .no-data { text-align:center; padding:64px 32px; color:rgba(229,231,235,0.5); font-size:15px; }
+
+.controls-buttons { display:flex; gap:12px; align-items:center; margin-bottom:16px; }
 </style>
 </head>
 <body>
@@ -114,7 +118,10 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
       <p>ISS Position Records Archive</p>
     </div>
   </div>
-  <button class="download-button" onclick="downloadAll()">💾 Download All Days</button>
+  <div class="controls-buttons">
+    <button class="back-dashboard" onclick="window.location.href='/'">🏠 Back</button>
+    <button class="download-button" onclick="downloadAll()">💾 Download All Data</button>
+  </div>
 </header>
 
 <div class="container">
@@ -158,25 +165,21 @@ th, td { padding:18px 24px; font-size:14px; color:rgba(229,231,235,0.9); text-al
 </div>
 
 <script>
-let records = [];
-let days = [];
-let currentDay = null;
+let records=[], days=[], currentDay=null;
 
-async function fetchAllData() {
-  try {
-    const res = await fetch('/api/all-records');
-    const data = await res.json();
-    records = data.records || [];
-    days = data.available_days || [];
+async function fetchAllData(){
+  try{
+    const res=await fetch('/api/all-records');
+    const data=await res.json();
+    records=data.records||[];
+    days=data.available_days||[];
 
     updateSummary(data);
     updateDateList();
     updateDaySelect();
-    if (!currentDay && days.length>0) currentDay=days[0];
+    if(!currentDay && days.length>0) currentDay=days[0];
     renderTable();
-  } catch(err) {
-    console.error('Failed to load data:', err);
-  }
+  }catch(err){ console.error(err); }
 }
 
 function updateSummary(data){
