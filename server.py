@@ -1,38 +1,29 @@
-# server.py — ISS collector with Malaysian time (UTC+8), daily CSV files
-from flask import Flask, jsonify, send_from_directory, request
+# server.py — ISS collector with Malaysian time (UTC+8)
+from flask import Flask, jsonify, send_file, Response, request
 import requests, csv, os
 from threading import Thread, Event
 from datetime import datetime, timedelta, timezone
 import time
 
 app = Flask(__name__)
+DATA_FILE = 'iss_data.csv'
 FETCH_INTERVAL = 60  # seconds
 stop_event = Event()
-
 MYT = timezone(timedelta(hours=8))  # Malaysia Time UTC+8
-DATA_DIR = 'data'  # folder to store daily CSVs
-os.makedirs(DATA_DIR, exist_ok=True)
+
+# Ensure CSV file exists
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['id','timestamp','latitude','longitude','altitude','velocity','ts_myt'])
 
 def safe_float(v):
     try:
         return float(v)
-    except Exception:
+    except:
         return None
 
-def get_today_filename():
-    """Return today's CSV filename (e.g. data/iss_data_2025-11-12.csv)."""
-    date_str = datetime.now(MYT).strftime('%Y-%m-%d')
-    return os.path.join(DATA_DIR, f"iss_data_{date_str}.csv")
-
-def ensure_file_exists(path):
-    """Create file with header if not exists."""
-    if not os.path.exists(path):
-        with open(path, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['timestamp','latitude','longitude','altitude','velocity','ts_myt'])
-
 def fetch_and_save_iss_data():
-    """Fetch ISS data and save to today's CSV."""
     try:
         res = requests.get('https://api.wheretheiss.at/v1/satellites/25544', timeout=8)
         if res.status_code == 200:
@@ -42,14 +33,22 @@ def fetch_and_save_iss_data():
             longitude = safe_float(d.get('longitude'))
             altitude = safe_float(d.get('altitude'))
             velocity = safe_float(d.get('velocity'))
+
             ts_myt = datetime.fromtimestamp(timestamp, tz=MYT).strftime('%Y-%m-%d %H:%M:%S')
             ts_myt_excel = "'" + ts_myt
 
-            file_path = get_today_filename()
-            ensure_file_exists(file_path)
-            with open(file_path, 'a', newline='') as f:
+            # Determine next ID
+            next_id = 1
+            if os.path.exists(DATA_FILE):
+                with open(DATA_FILE,'r') as f:
+                    lines = list(csv.reader(f))
+                    if len(lines) > 1:
+                        last_id = lines[-1][0]
+                        next_id = int(last_id) + 1
+
+            with open(DATA_FILE, 'a', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow([timestamp, latitude, longitude, altitude, velocity, ts_myt_excel])
+                writer.writerow([next_id, timestamp, latitude, longitude, altitude, velocity, ts_myt_excel])
             return True
     except Exception as e:
         print("Error fetching ISS data:", e)
@@ -60,10 +59,12 @@ def fetch_loop():
         fetch_and_save_iss_data()
         stop_event.wait(FETCH_INTERVAL)
 
+# Start background fetching thread (skip on Render)
 if os.environ.get("RENDER") is None:
     t = Thread(target=fetch_loop, daemon=True)
     t.start()
 
+# --- API Routes ---
 @app.route('/api/fetch-now')
 def api_fetch_now():
     success = fetch_and_save_iss_data()
@@ -71,61 +72,76 @@ def api_fetch_now():
 
 @app.route('/api/all-records')
 def api_all_records():
-    """Return all records grouped by date."""
-    all_data = []
-    available_days = []
+    if not os.path.exists(DATA_FILE):
+        return jsonify({"records": [], "total":0, "available_days":[]})
 
-    for file in sorted(os.listdir(DATA_DIR), reverse=True):
-        if not file.startswith('iss_data_') or not file.endswith('.csv'):
-            continue
-        date = file.replace('iss_data_', '').replace('.csv', '')
-        available_days.append(date)
-        file_path = os.path.join(DATA_DIR, file)
-        with open(file_path, 'r') as f:
-            reader = csv.DictReader(f)
-            for i, r in enumerate(reader):
-                try:
-                    ts = int(r.get('timestamp', 0))
-                except Exception:
-                    continue
-                all_data.append({
-                    "id": i+1,
-                    "timestamp_unix": ts,
-                    "ts_myt": r.get('ts_myt'),
-                    "latitude": safe_float(r.get('latitude')),
-                    "longitude": safe_float(r.get('longitude')),
-                    "altitude": safe_float(r.get('altitude')),
-                    "velocity": safe_float(r.get('velocity')),
-                    "day": date
-                })
+    day_filter = request.args.get('day', None)
+    rows = []
 
-    all_data_sorted = sorted(all_data, key=lambda x: x['timestamp_unix'], reverse=True)
+    with open(DATA_FILE,'r') as f:
+        reader = csv.DictReader(f)
+        for r in reader:
+            try:
+                ts = int(r['timestamp'])
+            except:
+                continue
+            dt = datetime.fromtimestamp(ts, tz=MYT)
+            day = dt.strftime('%Y-%m-%d')
+            row = {
+                "id": int(r['id']),
+                "timestamp": ts,
+                "ts_myt": r.get('ts_myt', dt.strftime('%Y-%m-%d %H:%M:%S')),
+                "latitude": safe_float(r.get('latitude')),
+                "longitude": safe_float(r.get('longitude')),
+                "altitude": safe_float(r.get('altitude')),
+                "velocity": safe_float(r.get('velocity')),
+                "day": day
+            }
+            if day_filter is None or day_filter == day:
+                rows.append(row)
+
+    rows_sorted = sorted(rows, key=lambda x:x['timestamp'], reverse=True)
+    available_days = sorted(list({r['day'] for r in rows}), reverse=True)
+
     return jsonify({
-        "records": all_data_sorted,
-        "available_days": available_days,
-        "total": len(all_data_sorted)
+        "records": rows_sorted,
+        "total": len(rows_sorted),
+        "available_days": available_days
     })
+
+# --- Download Routes ---
+@app.route('/api/download')
+def download_all_csv():
+    path = os.path.join(os.getcwd(), DATA_FILE)
+    if os.path.exists(path):
+        return send_file(path, as_attachment=True, download_name='iss_all_days.csv', mimetype='text/csv')
+    return "CSV not found", 404
 
 @app.route('/api/download/<day>')
 def download_day_csv(day):
-    """Download specific day's CSV."""
-    filename = f"iss_data_{day}.csv"
-    file_path = os.path.join(DATA_DIR, filename)
-    if os.path.exists(file_path):
-        return send_from_directory(DATA_DIR, filename, as_attachment=True)
-    return "CSV file not found", 404
+    import io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID','Latitude','Longitude','Altitude','Velocity','Timestamp (MYT)'])
 
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE,'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row['ts_myt'][:10] == day:
+                    writer.writerow([row.get('id',''), row.get('latitude',''), row.get('longitude',''),
+                                     row.get('altitude',''), row.get('velocity',''), row.get('ts_myt','')])
+    output.seek(0)
+    return Response(output.getvalue(), mimetype='text/csv',
+                    headers={"Content-Disposition": f"attachment;filename=iss_{day}.csv"})
+
+# --- Serve Frontend ---
 @app.route('/')
-def serve_index():
-    return send_from_directory('.', 'index.html')
-
+def serve_index(): return send_file('index.html')
 @app.route('/database')
-def serve_database():
-    return send_from_directory('.', 'database.html')
-
-@app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory('.', path)
+def serve_database(): return send_file('database.html')
+@app.route('/<path:path>') 
+def serve_static(path): return send_file(path)
 
 if __name__ == '__main__':
     try:
